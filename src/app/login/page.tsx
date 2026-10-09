@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { sendWelcomeEmail } from "@/app/actions/auth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -19,18 +20,19 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     if (isSignUp) {
       if (password !== confirmPassword) {
-        alert("Passwords do not match");
+        toast({ title: "Passwords do not match", variant: "destructive" });
         setIsLoading(false);
         return;
       }
-      
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -42,7 +44,11 @@ export default function LoginPage() {
       });
 
       if (error) {
-        alert(error.message);
+        toast({
+          title: "Sign up failed",
+          description: error.message,
+          variant: "destructive",
+        });
         setIsLoading(false);
         return;
       }
@@ -50,7 +56,10 @@ export default function LoginPage() {
       // Immediately send welcome email (non-blocking)
       sendWelcomeEmail(email).catch(console.error);
 
-      alert("Account created successfully!");
+      toast({
+        title: "Account created successfully!",
+        description: "You can now sign in with your email and password.",
+      });
       setIsSignUp(false);
       setIsLoading(false);
     } else {
@@ -221,12 +230,11 @@ export default function LoginPage() {
             </AnimatePresence>
 
             {!isSignUp && (
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-2 text-slate-400 cursor-pointer">
-                  <input type="checkbox" className="h-4 w-4 rounded border-white/20 bg-white/5" />
-                  Remember me
-                </label>
-                <Link href="#" className="text-electric-light hover:text-electric transition-colors">
+              <div className="flex items-center justify-end text-sm">
+                <Link
+                  href="mailto:info@beyondintern.com?subject=Password%20Reset%20Request"
+                  className="text-electric-light hover:text-electric transition-colors"
+                >
                   Forgot password?
                 </Link>
               </div>

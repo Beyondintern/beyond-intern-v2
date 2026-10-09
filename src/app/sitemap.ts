@@ -3,7 +3,6 @@ import type { MetadataRoute } from "next";
 const BASE_URL = "https://www.beyondintern.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // ── Static core routes ────────────────────────────────────────────────────
   const staticRoutes: MetadataRoute.Sitemap = [
     {
       url: `${BASE_URL}/`,
@@ -18,7 +17,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
-      url: `${BASE_URL}/webinar`,
+      // /webinar does not exist — the live room lives at /webinar/live
+      url: `${BASE_URL}/webinar/live`,
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 0.9,
@@ -30,10 +30,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
+      url: `${BASE_URL}/collaborations`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
+      url: `${BASE_URL}/careers`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
+      url: `${BASE_URL}/contact`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.5,
+    },
+    {
       url: `${BASE_URL}/login`,
       lastModified: new Date(),
       changeFrequency: "yearly",
-      priority: 0.5,
+      priority: 0.4,
     },
     {
       url: `${BASE_URL}/privacy`,
@@ -47,13 +65,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "yearly",
       priority: 0.3,
     },
+    {
+      url: `${BASE_URL}/cookie`,
+      lastModified: new Date(),
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
   ];
 
-  // EXPLICITLY FILTER OUT and exclude any route path that starts with or contains /dashboard
-  const finalRoutes = staticRoutes.filter((route) => {
-    const urlString = route.url.toString();
-    return !urlString.includes("/dashboard");
-  });
-
-  return finalRoutes;
+  return staticRoutes;
 }

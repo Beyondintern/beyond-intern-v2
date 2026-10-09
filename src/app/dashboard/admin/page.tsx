@@ -231,15 +231,19 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!isAdmin) return;
-    // Invoke via .then() so setState is never called synchronously in the
-    // effect body — satisfies the React cascading-render lint rule.
-    loadCourses();
-    loadAnalytics();
-    loadWebinar();
-    loadCollabs();
-    // loadCourses/loadAnalytics/loadWebinar are stable (empty deps) — safe to omit from
-    // deps array, or include — either way there is no cascading render because
-    // state is set inside an async callback, not synchronously.
+    // Kick loaders off from a microtask so no setState can run synchronously
+    // inside this effect body — each loader only sets state after its awaits.
+    let active = true;
+    Promise.resolve().then(() => {
+      if (!active) return;
+      void Promise.all([
+        loadCourses(),
+        loadAnalytics(),
+        loadWebinar(),
+        loadCollabs(),
+      ]);
+    });
+    return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 

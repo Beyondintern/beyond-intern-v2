@@ -14,7 +14,7 @@ import {
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { fetchAllCourses } from "@/app/dashboard/admin/actions";
+import { searchCourses } from "@/app/dashboard/courses/actions";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function TopHeader({ onMenuClick }: { onMenuClick?: () => void }) {
@@ -30,7 +30,7 @@ export function TopHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchAllCourses().then(data => setAllCourses(data || []));
+    searchCourses().then(data => setAllCourses(data || []));
 
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {

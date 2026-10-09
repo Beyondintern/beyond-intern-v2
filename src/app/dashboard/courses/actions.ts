@@ -37,6 +37,32 @@ export async function getUserCourses() {
   }
 }
 
+export interface CourseSearchResult {
+  id: string;
+  title: string;
+  category: string;
+}
+
+/**
+ * Course titles/categories for the dashboard predictive search.
+ * Available to any authenticated user (no admin required).
+ */
+export async function searchCourses(): Promise<CourseSearchResult[]> {
+  try {
+    await requireUser();
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin
+      .from("raw_courses")
+      .select("id, title, category");
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error("Search courses error:", error);
+    return [];
+  }
+}
+
 export async function checkEnrollment(courseId: string): Promise<boolean> {
   try {
     const user = await requireUser();

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 
-interface Toast {
+export interface Toast {
   id: string;
   title?: string;
   description?: string;
@@ -36,16 +36,22 @@ export function dismissToast(id: string) {
   notify();
 }
 
+/** Subscribe to the shared toast store; returns an unsubscribe function. */
+export function subscribeToToasts(listener: Listener) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 export function Toaster() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   useEffect(() => {
     const handler: Listener = (t) => setToasts([...t]);
-    listeners.add(handler);
+    const unsubscribe = subscribeToToasts(handler);
     handler(globalToasts); // Initial sync
-    return () => {
-      listeners.delete(handler);
-    };
+    return unsubscribe;
   }, []);
 
   return (
@@ -88,3 +94,6 @@ export function Toaster() {
 export function showToast(opts: Omit<Toast, "id">) {
   dispatchToast({ id: Math.random().toString(36).slice(2), ...opts });
 }
+
+/** Alias used by the useToast hook — same shared store. */
+export const toast = showToast;

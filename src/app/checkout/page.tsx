@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import { courseData as allCourses } from "@/lib/courses";
 
 const gradientMap: Record<string, string> = {
@@ -35,6 +36,7 @@ function CheckoutContent() {
   const courseDuration = foundCourse?.duration ?? "12–20 Weeks";
   const courseGradient = gradientMap[courseCategory] ?? "from-blue-600/30 to-cyan-500/20";
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   const handlePayment = async () => {
     setLoading(true);
@@ -42,18 +44,24 @@ function CheckoutContent() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          courseId,
-          courseName: courseTitle,
-          price: coursePrice,
-        }),
+        body: JSON.stringify({ courseId }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.url) {
         window.location.href = data.url;
+        return;
       }
+      toast({
+        title: "Checkout failed",
+        description: data.error || "Please try again in a moment.",
+        variant: "destructive",
+      });
     } catch {
-      console.error("Checkout failed");
+      toast({
+        title: "Checkout failed",
+        description: "Network error — please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

@@ -96,28 +96,33 @@ function CourseCard({ course, i }: { course: UserCourse; i: number }) {
 export default function CoursesPage() {
   const { data: session, status } = useSession();
   const [userCourses, setUserCourses] = useState<UserCourse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(status === "loading");
 
   useEffect(() => {
-    async function fetchEnrolledCourses() {
-      if (status !== "authenticated") return;
-      setIsLoading(true);
-      try {
-        const data = await getUserCourses();
-        setUserCourses(data);
-      } catch (err) {
-        console.error("Failed to fetch enrolled courses:", err);
-        setUserCourses([]);
-      } finally {
-        setIsLoading(false);
-      }
+    if (status === "loading") return;
+    if (status !== "authenticated") {
+      // Resolve the skeleton once auth settles as unauthenticated —
+      // done via a microtask so setState isn't called synchronously here.
+      let active = true;
+      Promise.resolve().then(() => {
+        if (active) setIsLoading(false);
+      });
+      return () => { active = false; };
     }
 
-    if (status === "authenticated") {
-      fetchEnrolledCourses();
-    } else if (status !== "loading") {
-      setIsLoading(false);
-    }
+    let active = true;
+    (async () => {
+      try {
+        const data = await getUserCourses();
+        if (active) setUserCourses(data);
+      } catch (err) {
+        console.error("Failed to fetch enrolled courses:", err);
+        if (active) setUserCourses([]);
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
+    return () => { active = false; };
   }, [session, status]);
 
   const enrolledCourseDetails = userCourses;

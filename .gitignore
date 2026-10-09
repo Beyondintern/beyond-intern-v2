@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env.local*
+.env
 
 # vercel
 .vercel
@@ -39,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local dev artifacts (screenshots, build logs, scraped copy)
+build_error.txt
+raw_*.txt
+*_check_*.webp
+.impeccable/
