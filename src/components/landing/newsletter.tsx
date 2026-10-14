@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { subscribeToNewsletter } from "@/app/actions/newsletter";
+import { trackSpotlight } from "@/lib/interactions";
 
 export function Newsletter() {
   const [email, setEmail] = useState("");
@@ -82,7 +83,7 @@ export function Newsletter() {
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="glass-card rounded-2xl p-6 max-w-md mx-auto"
+                className="glass-card spotlight-card rounded-2xl p-6 max-w-md mx-auto" onPointerMove={trackSpotlight}
               >
                 <div className="flex items-center justify-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald/20">

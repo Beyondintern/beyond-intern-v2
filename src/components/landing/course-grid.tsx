@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, ArrowRight, BookOpen, Filter, ChevronDown, Loader2 } from "lucide-react";
+import { Clock, ArrowRight, BookOpen, Filter, ChevronDown, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
+import { trackSpotlight } from "@/lib/interactions";
 
 // ── DB course shape ────────────────────────────────────────────────────────────
 interface DbCourse {
@@ -88,6 +89,9 @@ const ALL_CATEGORIES = [
 function CourseCard({ course, index }: { course: DbCourse; index: number }) {
   const config = categoryConfig[course.category] ?? categoryConfig["Technical Skills"];
   const outcomesList = course.outcomes ? course.outcomes.split("\n").filter(Boolean) : [];
+  // Price arrives as a raw string like "£650" from the DB; keep it verbatim
+  // (already currency-formatted) and only fall back for empty/null.
+  const isComplimentary = !course.price;
 
   return (
     <motion.div
@@ -96,7 +100,8 @@ function CourseCard({ course, index }: { course: DbCourse; index: number }) {
       viewport={{ once: true, margin: "-50px" }}
       transition={{ duration: 0.5, delay: (index % 6) * 0.08 }}
       whileHover={{ y: -6 }}
-      className="group glass-card rounded-2xl overflow-hidden flex flex-col"
+      onPointerMove={trackSpotlight}
+      className="group glass-card spotlight-card rounded-2xl overflow-hidden flex flex-col transition-shadow duration-300 hover:shadow-[0_16px_48px_rgba(3,7,20,0.55)]"
     >
       {/* Thumbnail */}
       <div
@@ -133,6 +138,14 @@ function CourseCard({ course, index }: { course: DbCourse; index: number }) {
             {course.category}
           </Badge>
         </div>
+
+        {/* Duration chip — bottom-left over the image, away from the badge */}
+        <div className="absolute bottom-3 left-3 z-10">
+          <span className="flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+            <Clock className="h-3 w-3 text-electric-light" aria-hidden="true" />
+            {course.duration}
+          </span>
+        </div>
       </div>
 
       {/* Content */}
@@ -150,14 +163,10 @@ function CourseCard({ course, index }: { course: DbCourse; index: number }) {
           {course.description}
         </p>
 
-        {/* Stats row */}
+        {/* Stats row — level only; duration moved onto the image chip */}
         <div className="mt-4 flex items-center gap-4 text-xs text-slate-400">
           <span className="flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            {course.duration}
-          </span>
-          <span className="flex items-center gap-1">
-            <BookOpen className="h-3.5 w-3.5" />
+            <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
             {course.level}
           </span>
         </div>
@@ -176,13 +185,20 @@ function CourseCard({ course, index }: { course: DbCourse; index: number }) {
 
         {/* CTA */}
         <div className="mt-auto pt-4 flex items-center justify-between border-t border-slate-800">
-          <span className="text-xl font-bold text-white">
-            {course.price || 'Free'}
-          </span>
+          {isComplimentary ? (
+            <span className="flex items-center gap-1.5 text-xl font-bold text-emerald">
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              <span className="text-sm font-semibold tracking-wide">Free</span>
+            </span>
+          ) : (
+            <span className="text-xl font-bold text-white">
+              {course.price}
+            </span>
+          )}
           <Link href={`/checkout?course=${encodeURIComponent(course.id)}`}>
             <Button
               size="sm"
-              className="gradient-electric text-white rounded-full px-5 text-xs font-semibold hover:opacity-90 transition-opacity"
+              className="gradient-electric text-white rounded-full px-5 text-xs font-semibold hover:opacity-90 active:scale-[0.97] transition-all"
             >
               View Course
               <ArrowRight className="ml-1 h-3.5 w-3.5" />
@@ -204,17 +220,24 @@ export function CourseGrid() {
 
   useEffect(() => {
     async function load() {
-      const { data, error } = await supabase
-        .from("raw_courses")
-        .select("*")
-        .order("created_at", { ascending: true });
+      try {
+        const { data, error } = await supabase
+          .from("raw_courses")
+          .select("*")
+          .order("created_at", { ascending: true });
 
-      if (error) {
+        if (error) {
+          setLoadError(true);
+        } else if (data) {
+          setCourses(data);
+        }
+      } catch {
+        // Client init throw (missing env) or network failure — surface the
+        // error state instead of hanging on the skeleton forever.
         setLoadError(true);
-      } else if (data) {
-        setCourses(data);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     load();
   }, []);
@@ -279,8 +302,22 @@ export function CourseGrid() {
 
         {/* Loading state */}
         {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 text-electric animate-spin" />
+          <div aria-busy="true" aria-label="Loading courses" className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="glass-card rounded-2xl overflow-hidden">
+                <div className="skeleton-shimmer h-44" />
+                <div className="p-5 space-y-3">
+                  <div className="skeleton-shimmer h-3 w-1/3 rounded-full" />
+                  <div className="skeleton-shimmer h-4 w-5/6 rounded-full" />
+                  <div className="skeleton-shimmer h-3 w-2/3 rounded-full" />
+                  <div className="skeleton-shimmer h-3 w-1/2 rounded-full" />
+                  <div className="mt-4 flex items-center justify-between">
+                    <div className="skeleton-shimmer h-5 w-16 rounded-full" />
+                    <div className="skeleton-shimmer h-8 w-24 rounded-full" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : loadError ? (
           <div className="py-20 text-center">

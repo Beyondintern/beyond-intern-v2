@@ -46,3 +46,4 @@ build_error.txt
 raw_*.txt
 *_check_*.webp
 .impeccable/
+.claude/launch.json

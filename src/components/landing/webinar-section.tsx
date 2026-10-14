@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Calendar, CheckCircle2, Clock, ExternalLink, Mic, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { getActiveWebinar, registerForWebinar } from "@/app/dashboard/admin/actions";
+import { trackSpotlight } from "@/lib/interactions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,7 +77,7 @@ export function WebinarSection() {
 
         <div className="grid items-start gap-10 lg:grid-cols-5">
           <motion.div initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="flex flex-col gap-6 lg:col-span-2">
-            <div className="glass-card rounded-2xl p-6">
+            <div className="glass-card spotlight-card rounded-2xl p-6" onPointerMove={trackSpotlight}>
               <div className="mb-5 flex items-center gap-3">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl gradient-electric glow-blue"><Sparkles className="h-6 w-6 text-white" aria-hidden="true" /></div>
                 <div><h3 className="text-lg font-bold text-white">{webinar?.title || "No upcoming webinar scheduled"}</h3><p className="text-xs text-slate-400">{webinar ? "Beyond Intern Live Webinar" : "Join the newsletter for the next event invite"}</p></div>
@@ -88,7 +89,7 @@ export function WebinarSection() {
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="lg:col-span-3">
-            <div className="glass-card rounded-2xl p-7">
+            <div className="glass-card spotlight-card rounded-2xl p-7" onPointerMove={trackSpotlight}>
               <AnimatePresence mode="wait">
                 {registered ? <motion.div key="success" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-16 text-center"><div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full border border-emerald-500/20 bg-emerald-500/10"><CheckCircle2 className="h-10 w-10 text-emerald-400" aria-hidden="true" /></div><h3 className="mb-2 text-2xl font-bold text-white">You&apos;re Registered!</h3><p className="max-w-xs leading-relaxed text-slate-400">Your spot is secured. We&apos;ll send the webinar link to your inbox before the event.</p></motion.div> : <motion.form key="form" ref={formRef} onSubmit={handleSubmit} className="space-y-6"><div><h3 className="mb-1 text-lg font-bold text-white">{eventState === "none" ? "Get the next webinar invite" : "Register for Free"}</h3><p className="text-xs text-slate-400">Secure your spot in minutes.</p></div><fieldset><legend className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Personal Information</legend><div className="grid gap-3 sm:grid-cols-2"><div className="sm:col-span-2"><label htmlFor="webinar-full-name" className="sr-only">Full name</label><Input id="webinar-full-name" required placeholder="Full Name *" value={fullName} onChange={(event) => setFullName(event.target.value)} disabled={!webinar || submitting} className="bg-white/5 text-white" /></div><div><label htmlFor="webinar-email" className="sr-only">Email address</label><Input id="webinar-email" required type="email" placeholder="Email Address *" value={email} onChange={(event) => setEmail(event.target.value)} disabled={!webinar || submitting} className="bg-white/5 text-white" /></div><div><label htmlFor="webinar-phone" className="sr-only">Phone number</label><Input id="webinar-phone" type="tel" placeholder="Phone Number" disabled={!webinar || submitting} className="bg-white/5 text-white" /></div></div></fieldset><fieldset disabled={!webinar || submitting}><legend className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Career interests</legend><div className="flex flex-wrap gap-2">{CAREER_INTERESTS.map((interest) => <button key={interest} type="button" aria-pressed={interests.includes(interest)} onClick={() => setInterests((current) => current.includes(interest) ? current.filter((item) => item !== interest) : [...current, interest])} className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-electric-light">{interest}</button>)}</div></fieldset>{regError && <p className="text-sm text-rose-300" role="alert">{regError}</p>}<Button type="submit" disabled={!webinar || submitting} className="h-12 w-full rounded-xl gradient-electric font-semibold text-white glow-blue">{submitting ? "Registering…" : eventState === "none" ? "Notify Me" : "Secure My Spot"}</Button><p className="text-center text-[11px] text-slate-500">By registering, you agree to receive event details from Beyond Intern.</p></motion.form>}
               </AnimatePresence>

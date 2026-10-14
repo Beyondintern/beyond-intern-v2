@@ -10,10 +10,12 @@ import {
   CheckCircle2,
   Clock,
   BookOpen,
+  GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { trackSpotlight } from "@/lib/interactions";
 import { courseData as allCourses } from "@/lib/courses";
 
 const gradientMap: Record<string, string> = {
@@ -95,10 +97,11 @@ function CheckoutContent() {
             transition={{ delay: 0.1 }}
             className="lg:col-span-3"
           >
-            <div className="glass-card rounded-2xl overflow-hidden">
-              <div className={`h-48 bg-linear-to-br ${courseGradient} flex items-center justify-center`}>
+            <div className="glass-card spotlight-card rounded-2xl overflow-hidden" onPointerMove={trackSpotlight}>
+              <div className={`relative h-48 bg-linear-to-br ${courseGradient} flex items-center justify-center overflow-hidden`}>
                 <div className="absolute inset-0 bg-navy/30" />
-                <span className="relative z-10 text-6xl opacity-40">🎓</span>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.12),transparent_55%)]" />
+                <GraduationCap className="relative z-10 h-20 w-20 text-white/40" strokeWidth={1.5} aria-hidden="true" />
               </div>
               <div className="p-6">
                 <h2 className="text-xl font-semibold text-white">{courseTitle}</h2>
@@ -141,7 +144,7 @@ function CheckoutContent() {
             transition={{ delay: 0.2 }}
             className="lg:col-span-2"
           >
-            <div className="glass-card rounded-2xl p-6 sticky top-24">
+            <div className="glass-card spotlight-card rounded-2xl p-6 sticky top-24" onPointerMove={trackSpotlight}>
               <h3 className="text-lg font-semibold text-white mb-6">Order Summary</h3>
 
               <div className="space-y-3 text-sm">

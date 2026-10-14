@@ -2,9 +2,11 @@
 
 import { useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { Play, ChevronLeft, ChevronRight, Radio, Star } from "lucide-react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { trackSpotlight } from "@/lib/interactions";
 
 interface VideoItem {
   id: string;
@@ -83,28 +85,45 @@ const videos: VideoItem[] = [
 function VideoCard({ video }: { video: VideoItem }) {
   const [isHovered, setIsHovered] = useState(false);
 
-  const gradients: Record<string, string> = {
-    webinar: "from-electric/20 to-electric-dark/20",
-    review: "from-gold/20 to-gold-light/10",
-  };
-
   return (
     <motion.div
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       whileHover={{ scale: 1.02, y: -4 }}
-      className="glass-card rounded-2xl overflow-hidden min-w-[280px] max-w-[300px] shrink-0 cursor-pointer group"
+      onPointerMove={trackSpotlight}
+      className="glass-card spotlight-card rounded-2xl overflow-hidden min-w-[280px] max-w-[300px] shrink-0 cursor-pointer group active:scale-[0.98] transition-transform"
     >
-      {/* Thumbnail */}
-      <div className={`relative h-44 bg-linear-to-br ${gradients[video.type]} flex items-center justify-center`}>
-        <div className="absolute inset-0 bg-navy/40" />
+      {/* Thumbnail — real image with cinematic depth treatment */}
+      <div className="relative h-44 flex items-center justify-center overflow-hidden">
+        <Image
+          src={video.thumbnail}
+          alt={`${video.title} — ${video.type === "webinar" ? "webinar session" : "student review"} on Beyond Intern`}
+          fill
+          sizes="300px"
+          className="object-cover"
+        />
+        {/* Brand-tinted scrim for legibility, deepening on hover */}
+        <div
+          className={`absolute inset-0 transition-colors duration-500 ${
+            isHovered ? "bg-navy/65" : "bg-navy/45"
+          }`}
+        />
+        {/* Electric tint ring ties the imagery back to the brand accent */}
+        <div
+          className={`pointer-events-none absolute inset-0 mix-blend-overlay transition-opacity duration-500 ${
+            video.type === "webinar"
+              ? "bg-electric/25"
+              : "bg-gold/20"
+          } ${isHovered ? "opacity-80" : "opacity-40"}`}
+        />
 
         {/* Play button */}
         <motion.div
-          animate={isHovered ? { scale: 1.1 } : { scale: 1 }}
-          className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full glass glow-blue"
+          animate={isHovered ? { scale: 1.12 } : { scale: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 20 }}
+          className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full glass-strong glow-blue"
         >
-          <Play className="h-6 w-6 text-white fill-white ml-0.5" />
+          <Play className="h-6 w-6 text-white fill-white ml-0.5" aria-hidden="true" />
         </motion.div>
 
         {/* Duration badge */}
@@ -112,17 +131,22 @@ function VideoCard({ video }: { video: VideoItem }) {
           {video.duration}
         </div>
 
-        {/* Type badge */}
+        {/* Type badge — icon + label instead of emoji */}
         <div className="absolute top-3 left-3 z-10">
           <Badge
             variant="secondary"
-            className={`text-xs font-semibold ${
+            className={`gap-1 text-xs font-semibold ${
               video.type === "webinar"
                 ? "bg-electric/20 text-electric-light border-electric/30"
                 : "bg-gold/20 text-gold-light border-gold/30"
             }`}
           >
-            {video.type === "webinar" ? "📡 Webinar" : "⭐ Review"}
+            {video.type === "webinar" ? (
+              <Radio className="h-3 w-3" aria-hidden="true" />
+            ) : (
+              <Star className="h-3 w-3 fill-current" aria-hidden="true" />
+            )}
+            {video.type === "webinar" ? "Webinar" : "Review"}
           </Badge>
         </div>
       </div>
@@ -133,7 +157,7 @@ function VideoCard({ video }: { video: VideoItem }) {
           {video.title}
         </h3>
         <div className="mt-3 flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full gradient-electric flex items-center justify-center text-xs font-bold text-white">
+          <div className="h-7 w-7 rounded-full gradient-electric flex items-center justify-center text-xs font-bold text-white shrink-0">
             {video.author.charAt(0)}
           </div>
           <div className="min-w-0">
@@ -146,6 +170,7 @@ function VideoCard({ video }: { video: VideoItem }) {
             {Array.from({ length: 5 }).map((_, i) => (
               <Star
                 key={i}
+                aria-hidden="true"
                 className={`h-3 w-3 ${
                   i < Math.floor(video.rating!)
                     ? "fill-gold text-gold"
