@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { trackSpotlight } from "@/lib/interactions";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -132,7 +133,8 @@ function ReviewCard({ review, index }: { review: Review; index: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.4, delay: index * 0.08 }}
-      className="glass-card rounded-2xl p-6 group hover:border-electric/20 transition-all flex flex-col"
+      onPointerMove={trackSpotlight}
+      className="glass-card spotlight-card rounded-2xl p-6 group hover:border-electric/20 transition-all flex flex-col"
     >
       {/* Decorative quote icon */}
       <Quote className="h-8 w-8 text-electric/20 mb-3 shrink-0" />
@@ -186,23 +188,23 @@ function ReviewCard({ review, index }: { review: Review; index: number }) {
 
 function ReviewSkeleton() {
   return (
-    <div className="glass-card rounded-2xl p-6 animate-pulse space-y-3">
-      <div className="h-8 w-8 rounded-full bg-white/5" />
+    <div className="glass-card rounded-2xl p-6 space-y-3" aria-hidden="true">
+      <div className="h-8 w-8 rounded-full skeleton-shimmer" />
       <div className="flex gap-1">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-4 w-4 rounded bg-white/5" />
+          <div key={i} className="h-4 w-4 rounded skeleton-shimmer" />
         ))}
       </div>
       <div className="space-y-2">
-        <div className="h-3 rounded bg-white/5 w-full" />
-        <div className="h-3 rounded bg-white/5 w-5/6" />
-        <div className="h-3 rounded bg-white/5 w-4/6" />
+        <div className="h-3 rounded skeleton-shimmer w-full" />
+        <div className="h-3 rounded skeleton-shimmer w-5/6" />
+        <div className="h-3 rounded skeleton-shimmer w-4/6" />
       </div>
       <div className="flex items-center gap-3 pt-4 border-t border-white/5">
-        <div className="h-10 w-10 rounded-full bg-white/5" />
+        <div className="h-10 w-10 rounded-full skeleton-shimmer" />
         <div className="space-y-1.5">
-          <div className="h-3 rounded bg-white/5 w-24" />
-          <div className="h-2.5 rounded bg-white/5 w-16" />
+          <div className="h-3 rounded skeleton-shimmer w-24" />
+          <div className="h-2.5 rounded skeleton-shimmer w-16" />
         </div>
       </div>
     </div>
@@ -237,17 +239,23 @@ export function Testimonials() {
   // ── Fetch approved reviews ──────────────────────────────────────────────
   useEffect(() => {
     async function fetchReviews() {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from("reviews")
-        .select("id, name, designation, rating, review_text, is_approved, created_at")
-        .eq("is_approved", true)
-        .order("created_at", { ascending: false });
+      try {
+        const { data, error } = await supabase
+          .from("reviews")
+          .select("id, name, designation, rating, review_text, is_approved, created_at")
+          .eq("is_approved", true)
+          .order("created_at", { ascending: false });
 
-      if (!error && data) {
-        setReviews(data as Review[]);
+        if (!error && data) {
+          setReviews(data as Review[]);
+        }
+        // On error: fall back to the curated reviews below rather than
+        // hanging on the skeleton.
+      } catch {
+        // Client init throw (missing env) — same fallback path.
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
     fetchReviews();
   }, []);

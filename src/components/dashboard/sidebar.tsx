@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Bell,
+  Briefcase,
   LogOut,
   X,
 } from "lucide-react";
@@ -26,6 +27,7 @@ const navItems = [
   { icon: BadgeCheck, label: "Certifications", href: "/dashboard/certifications", tooltip: "Download certificates" },
   { icon: Bell, label: "Notifications", href: "/dashboard/notifications", tooltip: "Alerts & updates" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings", tooltip: "Account & preferences" },
+  { icon: Briefcase, label: "My Internships", href: "/dashboard/internships", tooltip: "Assigned internship placements" },
 ];
 
 interface SidebarProps {

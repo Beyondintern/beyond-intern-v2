@@ -87,7 +87,9 @@ export default async function CourseVideoPage({ params }: PageProps) {
     isEnrolled = await checkEnrollment(courseId);
   }
 
-  let numericPrice = "0";
+  // Complimentary courses (price null/empty) use price 0 rather than
+  // an accidental "0" default for paid courses missing a parseable price.
+  let numericPrice: string | null = null;
   if (course?.price) {
     const stripped = String(course.price).replace(/[^\d.]/g, '');
     if (stripped) {
@@ -107,7 +109,7 @@ export default async function CourseVideoPage({ params }: PageProps) {
     },
     offers: {
       "@type": "Offer",
-      price: numericPrice,
+      price: numericPrice ?? "0",
       priceCurrency: "GBP"
     }
   } : null;

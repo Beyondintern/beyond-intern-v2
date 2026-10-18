@@ -180,6 +180,90 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* ── Spotlight cards: cursor-tracked interior glow + border ring ──
+     Consumers set --spot-x / --spot-y via trackSpotlight() on pointer
+     move; no React state, so no re-renders on mouse movement. */
+  .spotlight-card {
+    position: relative;
+    isolation: isolate;
+  }
+  .spotlight-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      480px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(96, 165, 250, 0.1),
+      transparent 45%
+    );
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+    z-index: -1;
+  }
+  .spotlight-card:hover::before {
+    opacity: 1;
+  }
+  .spotlight-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: radial-gradient(
+      320px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(96, 165, 250, 0.55),
+      transparent 45%
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .spotlight-card:hover::after {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .spotlight-card::before,
+    .spotlight-card::after {
+      transition: none;
+    }
+  }
+
+  /* ── Tactile press feedback for non-motion buttons ── */
+  .press {
+    transition: transform 0.15s ease;
+  }
+  .press:active {
+    transform: scale(0.97);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .press {
+      transition: none;
+    }
+  }
+
+  /* ── Skeleton shimmer: light sweep across placeholder blocks ── */
+  .skeleton-shimmer {
+    background: linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0.03) 40%,
+      rgba(255, 255, 255, 0.09) 50%,
+      rgba(255, 255, 255, 0.03) 60%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
 }
 
 /* ── Custom scrollbar ──────────────────────────────────────── */
@@ -226,4 +310,14 @@
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+    background: rgba(255, 255, 255, 0.05);
+  }
 }

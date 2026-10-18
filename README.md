@@ -5,22 +5,22 @@ Beyond Intern is an enterprise-grade, full-stack educational platform engineered
 ##  The Competitive Edge: Why This Architecture Excels
 
 Unlike legacy LMS platforms (like WordPress/LearnDash or basic React apps), Beyond Intern is built on a modern, edge-ready architecture:
-* **Blazing Fast Performance:** Utilizing Next.js 15 App Router and React Server Components (RSC) to ship zero-client-side JavaScript where possible, resulting in near-instant page loads and perfect Core Web Vitals.
+* **Blazing Fast Performance:** Utilizing Next.js 16 App Router and React Server Components (RSC) to ship zero-client-side JavaScript where possible, resulting in near-instant page loads and perfect Core Web Vitals.
 * **Intelligent AI Integration:** Features a custom-built, streaming AI Advisor powered by Google's Gemini 2.0 Flash model, integrated directly into the UI without feeling like a generic "wrapper."
-* **Enterprise-Grade Security:** Session management via NextAuth (OAuth & Magic Links), completely severing the frontend from raw database access.
+* **Enterprise-Grade Security:** Session management via NextAuth (OAuth & Magic Links), with server-side admin authorization enforced on every privileged action.
 * **High-Converting UI/UX:** Heavily optimized user flows, premium Tailwind CSS styling, translucent glassmorphism interfaces, and dynamic data pagination for frictionless browsing.
 
 ##  Tech Stack
 
 **Frontend & Core Framework:**
-* **Next.js 15** (App Router, Server Actions, Turbopack)
+* **Next.js 16** (App Router, Server Actions, Turbopack)
 * **React** (Hooks, Suspense, Concurrent Features)
 * **Tailwind CSS** (Custom theme, complex gradients, Backdrop Blur utilities)
 * **Framer Motion / Tailwind Animate** (Fluid transitions and component reveals)
 
 **Backend & Infrastructure:**
 * **Supabase (PostgreSQL):** Relational database with Row Level Security (RLS).
-* **NextAuth.js:** Secure authentication (Google OAuth provider + Email).
+* **NextAuth.js:** Secure authentication (Google OAuth + email/password credentials verified against Supabase Auth).
 * **Stripe API:** PCI-compliant checkout processing and secure webhook listeners.
 * **Vercel:** Edge network deployment and CI/CD pipeline.
 * **Google Generative AI SDK:** Streaming LLM integration (Gemini 2.0 Flash).
@@ -36,11 +36,12 @@ Unlike legacy LMS platforms (like WordPress/LearnDash or basic React apps), Beyo
 ##  Database Schema (Overview)
 
 The platform relies on a normalized PostgreSQL database designed for scale. Key tables include:
-* `Users`: Manages authentications, roles (student/admin), and profile metadata.
-* `Courses`: Stores curriculum data, pricing, duration, and categorization.
-* `Enrollments`: Junction table tracking `user_id`, `course_id`, payment status, and progress metrics.
-* `Webinar_Registrations`: Captures lead data for upcoming live events.
-* `Transactions`: Audit trail for Stripe payment intents and webhook receipts.
+* `auth.users`: Supabase-managed accounts (password + OAuth), surfaced to the app via the admin API.
+* `raw_courses`: Course catalog — curriculum, pricing, duration, categorization, video modules.
+* `user_courses`: Enrollment junction (`user_email`, `course_id`) granted by admin assignment.
+* `user_purchases`: Stripe purchase receipts (`user_id`, `course_id`, `stripe_session_id`) written by the verified webhook.
+* `webinars` / `webinar_registrations`: Active webinar state and lead capture.
+* `notifications`: Broadcast and direct messages filtered per-user server-side.
 
 ## \ Future Scope & Roadmap
 

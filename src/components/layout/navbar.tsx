@@ -15,6 +15,7 @@ import { useSession, signOut } from "next-auth/react";
 const navLinks = [
   { name: "Courses", href: "/#courses" },
   { name: "Webinars", href: "/#webinars" },
+  { name: "Internships", href: "/#internships" },
   { name: "About", href: "/about" },
   { name: "Blog", href: "/blog" },
   { name: "Associations", href: "/collaborations" },

@@ -10,9 +10,12 @@ import {
   CheckCircle2,
   Clock,
   BookOpen,
+  GraduationCap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { trackSpotlight } from "@/lib/interactions";
 import { courseData as allCourses } from "@/lib/courses";
 
 const gradientMap: Record<string, string> = {
@@ -35,6 +38,7 @@ function CheckoutContent() {
   const courseDuration = foundCourse?.duration ?? "12–20 Weeks";
   const courseGradient = gradientMap[courseCategory] ?? "from-blue-600/30 to-cyan-500/20";
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   const handlePayment = async () => {
     setLoading(true);
@@ -42,18 +46,24 @@ function CheckoutContent() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          courseId,
-          courseName: courseTitle,
-          price: coursePrice,
-        }),
+        body: JSON.stringify({ courseId }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.url) {
         window.location.href = data.url;
+        return;
       }
+      toast({
+        title: "Checkout failed",
+        description: data.error || "Please try again in a moment.",
+        variant: "destructive",
+      });
     } catch {
-      console.error("Checkout failed");
+      toast({
+        title: "Checkout failed",
+        description: "Network error — please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -87,10 +97,11 @@ function CheckoutContent() {
             transition={{ delay: 0.1 }}
             className="lg:col-span-3"
           >
-            <div className="glass-card rounded-2xl overflow-hidden">
-              <div className={`h-48 bg-linear-to-br ${courseGradient} flex items-center justify-center`}>
+            <div className="glass-card spotlight-card rounded-2xl overflow-hidden" onPointerMove={trackSpotlight}>
+              <div className={`relative h-48 bg-linear-to-br ${courseGradient} flex items-center justify-center overflow-hidden`}>
                 <div className="absolute inset-0 bg-navy/30" />
-                <span className="relative z-10 text-6xl opacity-40">🎓</span>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.12),transparent_55%)]" />
+                <GraduationCap className="relative z-10 h-20 w-20 text-white/40" strokeWidth={1.5} aria-hidden="true" />
               </div>
               <div className="p-6">
                 <h2 className="text-xl font-semibold text-white">{courseTitle}</h2>
@@ -133,7 +144,7 @@ function CheckoutContent() {
             transition={{ delay: 0.2 }}
             className="lg:col-span-2"
           >
-            <div className="glass-card rounded-2xl p-6 sticky top-24">
+            <div className="glass-card spotlight-card rounded-2xl p-6 sticky top-24" onPointerMove={trackSpotlight}>
               <h3 className="text-lg font-semibold text-white mb-6">Order Summary</h3>
 
               <div className="space-y-3 text-sm">

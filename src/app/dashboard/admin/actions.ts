@@ -91,3 +91,83 @@ export interface PressArticleRow { id: string; publisher_name: string; article_l
 export async function fetchPressArticles(): Promise<PressArticleRow[]> { try { const { data, error } = await supabaseAdmin.from("press_articles").select("*").order("created_at", { ascending: false }); if (error) throw error; return (data ?? []) as PressArticleRow[]; } catch (error) { console.error("Fetch press articles error:", error); return []; } }
 export async function insertPressArticle(publisher_name: string, article_link: string) { await guardAdmin(); try { const { error } = await supabaseAdmin.from("press_articles").insert({ publisher_name: publisher_name.trim(), article_link: article_link.trim() }); if (error) throw error; return { success: true }; } catch (error) { console.error("Insert press article error:", error); return { success: false, message: "Failed to add press article." }; } }
 export async function deletePressArticle(id: string) { await guardAdmin(); try { const { error } = await supabaseAdmin.from("press_articles").delete().eq("id", id); if (error) throw error; return { success: true }; } catch (error) { console.error("Delete press article error:", error); return { success: false, message: "Failed to delete press article." }; } }
+
+export interface InternshipRow {
+  id: string;
+  company: string;
+  role: string;
+  location: string | null;
+  employment_type: string | null;
+  pay_rate: string | null;
+  experience: string | null;
+  shift: string | null;
+  description: string | null;
+  responsibilities: string[] | null;
+  requirements: string[] | null;
+  benefits: string[] | null;
+  service_fee: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface InternshipInput {
+  id?: string;
+  company: string;
+  role: string;
+  location: string;
+  employment_type: string;
+  pay_rate: string;
+  experience: string;
+  shift: string;
+  description: string;
+  responsibilities: string;
+  requirements: string;
+  benefits: string;
+  service_fee: string;
+  is_active: boolean;
+}
+
+function parseInternshipInput(data: InternshipInput) {
+  const lines = (value: string) => value.split("\n").map((line) => line.trim()).filter(Boolean);
+  return {
+    company: data.company.trim(),
+    role: data.role.trim(),
+    location: data.location.trim() || null,
+    employment_type: data.employment_type.trim() || null,
+    pay_rate: data.pay_rate.trim() || null,
+    experience: data.experience.trim() || null,
+    shift: data.shift.trim() || null,
+    description: data.description.trim() || null,
+    responsibilities: lines(data.responsibilities),
+    requirements: lines(data.requirements),
+    benefits: lines(data.benefits),
+    service_fee: data.service_fee.trim() || null,
+    is_active: data.is_active,
+  };
+}
+
+export async function upsertInternship(data: InternshipInput) {
+  await guardAdmin();
+  try {
+    const parsed = parseInternshipInput(data);
+    if (!parsed.company || !parsed.role) return { success: false, message: "Company and role are required." };
+    if (data.id) {
+      const { error } = await supabaseAdmin.from("internships").update(parsed).eq("id", data.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabaseAdmin.from("internships").insert(parsed);
+      if (error) throw error;
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("Upsert internship error:", error);
+    return { success: false, message: "Failed to save internship." };
+  }
+}
+
+export async function deleteInternship(id: string) { await guardAdmin(); try { const { error } = await supabaseAdmin.from("internships").delete().eq("id", id); if (error) throw error; return { success: true }; } catch (error) { console.error("Delete internship error:", error); return { success: false, message: "Failed to delete internship." }; } }
+export async function fetchInternships(): Promise<InternshipRow[]> { try { const { data, error } = await supabaseAdmin.from("internships").select("*").order("created_at", { ascending: false }); if (error) throw error; return (data ?? []) as InternshipRow[]; } catch (error) { console.error("Fetch internships error:", error); return []; } }
+
+export interface InternshipAssignmentRow { id: string; user_email: string; internship_id: string; assigned_at: string; internship: { company: string; role: string } | null; }
+export async function assignInternship(email: string, internshipId: string) { await guardAdmin(); try { const normalizedEmail = email.trim().toLowerCase(); const { error } = await supabaseAdmin.from("internship_assignments").insert({ user_email: normalizedEmail, internship_id: internshipId }); if (error) { if (error.code === "23505") return { success: false, message: "This user is already assigned to that internship." }; throw error; } const { data: internship } = await supabaseAdmin.from("internships").select("company, role").eq("id", internshipId).single(); if (internship) await supabaseAdmin.from("notifications").insert({ title: "Internship Assignment", message: `You have been assigned to the ${internship.role} internship at ${internship.company}. Check your dashboard for details.`, type: "direct", target_email: normalizedEmail }); return { success: true }; } catch (error) { console.error("Assign internship error:", error); return { success: false, message: "An unexpected error occurred. Please try again." }; } }
+export async function getInternshipAssignments(): Promise<InternshipAssignmentRow[]> { await guardAdmin(); try { const { data, error } = await supabaseAdmin.from("internship_assignments").select("id, user_email, internship_id, assigned_at, internships(company, role)").order("assigned_at", { ascending: false }); if (error) throw error; return ((data ?? []) as unknown as InternshipAssignmentRow[]).map((row) => ({ ...row, internship: Array.isArray(row.internship) ? row.internship[0] ?? null : row.internship })); } catch (error) { console.error("Get internship assignments error:", error); return []; } }

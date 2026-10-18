@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { getUserCourses } from "./actions";
+import { trackSpotlight } from "@/lib/interactions";
 
 interface UserCourse {
   id: string;
@@ -39,10 +40,12 @@ function CourseCard({ course, i }: { course: UserCourse; i: number }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: i * 0.08 }}
-      className="glass-card rounded-2xl overflow-hidden flex flex-col group"
+      whileHover={{ y: -4 }}
+      onPointerMove={trackSpotlight}
+      className="glass-card spotlight-card rounded-2xl overflow-hidden flex flex-col group transition-shadow duration-300 hover:shadow-[0_16px_48px_rgba(3,7,20,0.55)]"
     >
-      {/* Card header gradient */}
-      <div className="h-2 bg-linear-to-r from-blue-500 via-purple-500 to-amber-500" />
+      {/* Card header gradient — brand electric-to-gold accent */}
+      <div className="h-2 bg-linear-to-r from-electric via-electric-light to-gold" />
 
       <div className="flex flex-1 flex-col p-6 gap-4">
         {/* Category pill */}
@@ -83,7 +86,7 @@ function CourseCard({ course, i }: { course: UserCourse; i: number }) {
 
         {/* CTA */}
         <Link href={`/dashboard/courses/${course.id}`} className="mt-2">
-          <Button className="w-full bg-blue-600 text-white font-semibold rounded-xl hover:opacity-90 transition-opacity text-sm">
+          <Button className="w-full gradient-electric text-white font-semibold rounded-xl hover:opacity-90 active:scale-[0.98] transition-all text-sm">
             <Play className="mr-2 h-4 w-4" />
             Start Learning
           </Button>
@@ -96,28 +99,33 @@ function CourseCard({ course, i }: { course: UserCourse; i: number }) {
 export default function CoursesPage() {
   const { data: session, status } = useSession();
   const [userCourses, setUserCourses] = useState<UserCourse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(status === "loading");
 
   useEffect(() => {
-    async function fetchEnrolledCourses() {
-      if (status !== "authenticated") return;
-      setIsLoading(true);
-      try {
-        const data = await getUserCourses();
-        setUserCourses(data);
-      } catch (err) {
-        console.error("Failed to fetch enrolled courses:", err);
-        setUserCourses([]);
-      } finally {
-        setIsLoading(false);
-      }
+    if (status === "loading") return;
+    if (status !== "authenticated") {
+      // Resolve the skeleton once auth settles as unauthenticated —
+      // done via a microtask so setState isn't called synchronously here.
+      let active = true;
+      Promise.resolve().then(() => {
+        if (active) setIsLoading(false);
+      });
+      return () => { active = false; };
     }
 
-    if (status === "authenticated") {
-      fetchEnrolledCourses();
-    } else if (status !== "loading") {
-      setIsLoading(false);
-    }
+    let active = true;
+    (async () => {
+      try {
+        const data = await getUserCourses();
+        if (active) setUserCourses(data);
+      } catch (err) {
+        console.error("Failed to fetch enrolled courses:", err);
+        if (active) setUserCourses([]);
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
+    return () => { active = false; };
   }, [session, status]);
 
   const enrolledCourseDetails = userCourses;
@@ -131,9 +139,17 @@ export default function CoursesPage() {
             My Courses
           </h1>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true" aria-label="Loading your courses">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-52 rounded-2xl glass-card animate-pulse bg-white/5" />
+            <div key={i} className="glass-card rounded-2xl overflow-hidden">
+              <div className="skeleton-shimmer h-2" />
+              <div className="p-6 space-y-3">
+                <div className="skeleton-shimmer h-5 w-24 rounded-full" />
+                <div className="skeleton-shimmer h-4 w-4/5 rounded-full" />
+                <div className="skeleton-shimmer h-3 w-2/3 rounded-full" />
+                <div className="skeleton-shimmer h-10 w-full rounded-xl" />
+              </div>
+            </div>
           ))}
         </div>
       </motion.div>
@@ -166,7 +182,7 @@ export default function CoursesPage() {
               You haven&apos;t been enrolled in any courses yet. Browse our catalog of 30+ industry-aligned programmes or contact support.
             </p>
             <Link href="/#courses">
-              <Button className="mt-6 bg-blue-600 text-white font-semibold rounded-full px-8 hover:opacity-90 transition-opacity">
+              <Button className="mt-6 gradient-electric text-white font-semibold rounded-full px-8 hover:opacity-90 active:scale-[0.98] transition-all">
                 Explore Courses
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
