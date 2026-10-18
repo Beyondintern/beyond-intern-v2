@@ -81,3 +81,45 @@ export async function checkEnrollment(courseId: string): Promise<boolean> {
     return false;
   }
 }
+
+export interface MyInternship {
+  id: string;
+  company: string;
+  role: string;
+  location: string | null;
+  employment_type: string | null;
+  pay_rate: string | null;
+  experience: string | null;
+  shift: string | null;
+  description: string | null;
+  responsibilities: string[] | null;
+  requirements: string[] | null;
+  benefits: string[] | null;
+  service_fee: string | null;
+  assigned_at: string;
+}
+
+/**
+ * Internships assigned to the signed-in student.
+ * Identity comes from the session, never a client argument.
+ */
+export async function getMyInternships(): Promise<MyInternship[]> {
+  try {
+    const user = await requireUser();
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data, error } = await supabaseAdmin
+      .from("internship_assignments")
+      .select("assigned_at, internships!inner(*)")
+      .eq("user_email", user.email)
+      .order("assigned_at", { ascending: false });
+
+    if (error) throw error;
+    return (data ?? []).map((row: { assigned_at: string; internships: Record<string, unknown> | Record<string, unknown>[] }) => ({
+      ...(Array.isArray(row.internships) ? row.internships[0] : row.internships),
+      assigned_at: row.assigned_at,
+    })) as MyInternship[];
+  } catch (error) {
+    console.error("Get my internships error:", error);
+    return [];
+  }
+}

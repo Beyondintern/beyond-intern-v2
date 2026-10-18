@@ -26,6 +26,7 @@ import {
   Globe,
   Newspaper,
   ExternalLink,
+  Briefcase,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,13 +53,19 @@ import {
   fetchPressArticles,
   insertPressArticle,
   deletePressArticle,
+  upsertInternship,
+  deleteInternship,
+  fetchInternships,
+  assignInternship,
+  getInternshipAssignments,
 } from "./actions";
+import type { InternshipRow, InternshipAssignmentRow } from "./actions";
 import type { CarouselImageRow, BrandPartnerRow, PressArticleRow } from "./actions";
 
 const ADMIN_EMAILS = ["info@beyondintern.com", "ansupoddar11@gmail.com"];
 
 type Status = "idle" | "loading" | "success" | "error";
-type Tab = "enrol" | "courses" | "analytics" | "webinars" | "notifications" | "collabs";
+type Tab = "enrol" | "courses" | "analytics" | "webinars" | "notifications" | "collabs" | "internships";
 
 interface VideoModule {
   id: string;
@@ -187,6 +194,31 @@ export default function AdminPage() {
   const [collabStatus, setCollabStatus] = useState<Status>("idle");
   const [collabMsg, setCollabMsg] = useState("");
 
+  // ── Internships State ──
+  const [internships, setInternships] = useState<InternshipRow[]>([]);
+  const [internshipForm, setInternshipForm] = useState({
+    id: "",
+    company: "",
+    role: "",
+    location: "",
+    employment_type: "",
+    pay_rate: "",
+    experience: "",
+    shift: "",
+    description: "",
+    responsibilities: "",
+    requirements: "",
+    benefits: "",
+    service_fee: "",
+    is_active: true,
+  });
+  const [editingInternship, setEditingInternship] = useState<string | null>(null);
+  const [internshipStatus, setInternshipStatus] = useState<Status>("idle");
+  const [internshipMsg, setInternshipMsg] = useState("");
+  const [assignEmail, setAssignEmail] = useState("");
+  const [assignInternshipId, setAssignInternshipId] = useState("");
+  const [internshipAssignments, setInternshipAssignments] = useState<InternshipAssignmentRow[]>([]);
+
   const isAdmin =
     session?.user?.email && ADMIN_EMAILS.includes(session.user.email);
 
@@ -216,6 +248,15 @@ export default function AdminPage() {
       setWebinarForm({ title: w.title, speaker: w.speaker || "", webinar_date: w.webinar_date || "", webinar_time: w.webinar_time || "" });
     }
     setWebinarRegs(regs as WebinarReg[]);
+  }, []);
+
+  const loadInternships = useCallback(async () => {
+    const [rows, assignments] = await Promise.all([
+      fetchInternships(),
+      getInternshipAssignments(),
+    ]);
+    setInternships(rows);
+    setInternshipAssignments(assignments);
   }, []);
 
   const loadCollabs = useCallback(async () => {
@@ -498,6 +539,85 @@ export default function AdminPage() {
     loadCollabs();
   }
 
+  // ── Internship Handlers ──
+  async function handleSaveInternship(e: React.FormEvent) {
+    e.preventDefault();
+    if (!internshipForm.company || !internshipForm.role) return;
+    setInternshipStatus("loading");
+    setInternshipMsg("");
+    const result = await upsertInternship({
+      id: editingInternship ?? undefined,
+      company: internshipForm.company,
+      role: internshipForm.role,
+      location: internshipForm.location,
+      employment_type: internshipForm.employment_type,
+      pay_rate: internshipForm.pay_rate,
+      experience: internshipForm.experience,
+      shift: internshipForm.shift,
+      description: internshipForm.description,
+      responsibilities: internshipForm.responsibilities,
+      requirements: internshipForm.requirements,
+      benefits: internshipForm.benefits,
+      service_fee: internshipForm.service_fee,
+      is_active: internshipForm.is_active,
+    });
+    if (result.success) {
+      setInternshipMsg(editingInternship ? "Internship updated successfully!" : "Internship published successfully!");
+      setInternshipStatus("success");
+      setInternshipForm({ id: "", company: "", role: "", location: "", employment_type: "", pay_rate: "", experience: "", shift: "", description: "", responsibilities: "", requirements: "", benefits: "", service_fee: "", is_active: true });
+      setEditingInternship(null);
+      loadInternships();
+    } else {
+      setInternshipMsg(result.message || "Failed to save internship.");
+      setInternshipStatus("error");
+    }
+  }
+
+  function handleEditInternship(row: InternshipRow) {
+    setInternshipForm({
+      id: row.id,
+      company: row.company,
+      role: row.role,
+      location: row.location ?? "",
+      employment_type: row.employment_type ?? "",
+      pay_rate: row.pay_rate ?? "",
+      experience: row.experience ?? "",
+      shift: row.shift ?? "",
+      description: row.description ?? "",
+      responsibilities: (row.responsibilities ?? []).join("\n"),
+      requirements: (row.requirements ?? []).join("\n"),
+      benefits: (row.benefits ?? []).join("\n"),
+      service_fee: row.service_fee ?? "",
+      is_active: row.is_active,
+    });
+    setEditingInternship(row.id);
+    setActiveTab("internships");
+  }
+
+  async function handleDeleteInternship(id: string) {
+    if (!confirm("Remove this internship listing permanently?")) return;
+    const result = await deleteInternship(id);
+    if (result.success) loadInternships();
+  }
+
+  async function handleAssignInternship(e: React.FormEvent) {
+    e.preventDefault();
+    if (!assignEmail || !assignInternshipId) return;
+    setInternshipStatus("loading");
+    setInternshipMsg("");
+    const result = await assignInternship(assignEmail, assignInternshipId);
+    if (result.success) {
+      setInternshipMsg(`Assigned to ${assignEmail.trim().toLowerCase()} successfully.`);
+      setInternshipStatus("success");
+      setAssignEmail("");
+      setAssignInternshipId("");
+      loadInternships();
+    } else {
+      setInternshipMsg(result.message || "Failed to assign internship.");
+      setInternshipStatus("error");
+    }
+  }
+
   /* Loading skeleton */
   if (status === "loading") {
     return (
@@ -533,6 +653,7 @@ export default function AdminPage() {
     { key: "webinars", label: "Manage Webinars", icon: <Radio className="h-4 w-4" /> },
     { key: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
     { key: "collabs", label: "Collabs & Press", icon: <Handshake className="h-4 w-4" /> },
+    { key: "internships", label: "Internships", icon: <Briefcase className="h-4 w-4" /> },
   ];
 
   return (
@@ -1647,6 +1768,323 @@ export default function AdminPage() {
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+        {activeTab === "internships" && (
+          <motion.div key="internships" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} className="space-y-8">
+            <div>
+              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                <Briefcase className="h-6 w-6 text-electric-light" />
+                Manage Internships
+              </h1>
+              <p className="mt-1 text-sm text-slate-400">
+                Publish employer internship listings and assign them to students. Assigned internships appear on the student dashboard.
+              </p>
+            </div>
+
+            {/* Status toast */}
+            {internshipStatus !== "idle" && internshipStatus !== "loading" && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`p-4 rounded-xl flex items-start gap-3 text-sm ${
+                  internshipStatus === "success"
+                    ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
+                    : "bg-rose-500/10 border border-rose-500/20 text-rose-300"
+                }`}
+              >
+                {internshipStatus === "success" ? <CheckCircle className="h-4 w-4 mt-0.5" /> : <AlertCircle className="h-4 w-4 mt-0.5" />}
+                {internshipMsg}
+              </motion.div>
+            )}
+
+            {/* 1. Listing Editor */}
+            <div className="glass-card rounded-2xl p-8 space-y-6">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <PlusCircle className="h-5 w-5 text-electric-light" />
+                {editingInternship ? "Edit Listing" : "New Listing"}
+                <span className="ml-1 text-xs font-medium px-2 py-0.5 rounded-full bg-electric/10 text-electric-light border border-electric/20">
+                  {internships.length} live
+                </span>
+              </h2>
+
+              <form onSubmit={handleSaveInternship} className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-company" className="text-xs font-medium text-slate-400">Company *</label>
+                    <Input
+                      id="int-company"
+                      placeholder="Amazon UK Services Ltd."
+                      value={internshipForm.company}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, company: e.target.value })}
+                      required
+                      className="h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-role" className="text-xs font-medium text-slate-400">Role *</label>
+                    <Input
+                      id="int-role"
+                      placeholder="Warehouse Operative / Fulfilment Associate"
+                      value={internshipForm.role}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, role: e.target.value })}
+                      required
+                      className="h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-location" className="text-xs font-medium text-slate-400">Location</label>
+                    <Input
+                      id="int-location"
+                      placeholder="United Kingdom"
+                      value={internshipForm.location}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, location: e.target.value })}
+                      className="h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-type" className="text-xs font-medium text-slate-400">Employment Type</label>
+                    <Input
+                      id="int-type"
+                      placeholder="Part-Time / Full-Time"
+                      value={internshipForm.employment_type}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, employment_type: e.target.value })}
+                      className="h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-pay" className="text-xs font-medium text-slate-400">Pay Rate</label>
+                    <Input
+                      id="int-pay"
+                      placeholder="£15.10 - £16.10 per hour"
+                      value={internshipForm.pay_rate}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, pay_rate: e.target.value })}
+                      className="h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-experience" className="text-xs font-medium text-slate-400">Experience</label>
+                    <Input
+                      id="int-experience"
+                      placeholder="No previous experience required"
+                      value={internshipForm.experience}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, experience: e.target.value })}
+                      className="h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-shift" className="text-xs font-medium text-slate-400">Shift</label>
+                    <Input
+                      id="int-shift"
+                      placeholder="Day / Night shifts, subject to availability"
+                      value={internshipForm.shift}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, shift: e.target.value })}
+                      className="h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-fee" className="text-xs font-medium text-slate-400">Application Support Fee</label>
+                    <Input
+                      id="int-fee"
+                      placeholder="From £300 (application support service)"
+                      value={internshipForm.service_fee}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, service_fee: e.target.value })}
+                      className="h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="int-description" className="text-xs font-medium text-slate-400">About the Role</label>
+                  <textarea
+                    id="int-description"
+                    placeholder="Describe the role, what the employer does, and who they are looking for..."
+                    value={internshipForm.description}
+                    onChange={(e) => setInternshipForm({ ...internshipForm, description: e.target.value })}
+                    rows={3}
+                    className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-electric/50 focus:outline-none focus:ring-1 focus:ring-electric/30 resize-none"
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-responsibilities" className="text-xs font-medium text-slate-400">Key Responsibilities</label>
+                    <textarea
+                      id="int-responsibilities"
+                      placeholder="One per line"
+                      value={internshipForm.responsibilities}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, responsibilities: e.target.value })}
+                      rows={5}
+                      className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-electric/50 focus:outline-none focus:ring-1 focus:ring-electric/30 resize-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-requirements" className="text-xs font-medium text-slate-400">Eligibility & Requirements</label>
+                    <textarea
+                      id="int-requirements"
+                      placeholder="One per line"
+                      value={internshipForm.requirements}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, requirements: e.target.value })}
+                      rows={5}
+                      className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-electric/50 focus:outline-none focus:ring-1 focus:ring-electric/30 resize-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="int-benefits" className="text-xs font-medium text-slate-400">Benefits</label>
+                    <textarea
+                      id="int-benefits"
+                      placeholder="One per line"
+                      value={internshipForm.benefits}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, benefits: e.target.value })}
+                      rows={5}
+                      className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-electric/50 focus:outline-none focus:ring-1 focus:ring-electric/30 resize-none"
+                    />
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={internshipForm.is_active}
+                    onChange={(e) => setInternshipForm({ ...internshipForm, is_active: e.target.checked })}
+                    className="h-4 w-4 rounded border-white/20 bg-white/5 accent-electric"
+                  />
+                  <span className="text-sm text-slate-300">Listing is live (visible on the public site)</span>
+                </label>
+
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="submit"
+                    disabled={internshipStatus === "loading"}
+                    className="h-11 px-6 gradient-electric text-white font-semibold rounded-xl glow-blue hover:opacity-90 active:scale-[0.98] transition-all"
+                  >
+                    {internshipStatus === "loading" ? "Saving..." : editingInternship ? "Update Listing" : "Publish Listing"}
+                  </Button>
+                  {editingInternship && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setEditingInternship(null);
+                        setInternshipForm({ id: "", company: "", role: "", location: "", employment_type: "", pay_rate: "", experience: "", shift: "", description: "", responsibilities: "", requirements: "", benefits: "", service_fee: "", is_active: true });
+                      }}
+                      className="h-11 rounded-xl border-white/15 text-slate-300 hover:bg-white/5"
+                    >
+                      Cancel Edit
+                    </Button>
+                  )}
+                </div>
+              </form>
+            </div>
+
+            {/* 2. Assign to Student */}
+            <div className="glass-card rounded-2xl p-8 space-y-6">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <UserPlus className="h-5 w-5 text-emerald" />
+                Assign to Student
+              </h2>
+              <form onSubmit={handleAssignInternship} className="flex flex-col sm:flex-row gap-3">
+                <Input
+                  type="email"
+                  placeholder="student@example.com"
+                  value={assignEmail}
+                  onChange={(e) => setAssignEmail(e.target.value)}
+                  required
+                  className="flex-1 h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                />
+                <select
+                  value={assignInternshipId}
+                  onChange={(e) => setAssignInternshipId(e.target.value)}
+                  required
+                  className="h-11 rounded-xl bg-white/5 border border-white/10 text-white px-3 text-sm focus:outline-none focus:border-electric/50"
+                >
+                  <option value="" className="bg-slate-900">Select internship...</option>
+                  {internships.map((row) => (
+                    <option key={row.id} value={row.id} className="bg-slate-900">
+                      {row.company} - {row.role}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="submit"
+                  disabled={internshipStatus === "loading" || !assignEmail || !assignInternshipId}
+                  className="h-11 px-6 gradient-electric text-white font-semibold rounded-xl glow-blue hover:opacity-90 active:scale-[0.98] transition-all shrink-0"
+                >
+                  <UserPlus className="mr-2 h-4 w-4" /> Assign
+                </Button>
+              </form>
+
+              {internshipAssignments.length > 0 && (
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                  {internshipAssignments.map((assignment) => (
+                    <div key={assignment.id} className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/3 hover:bg-white/6 transition-colors gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-300 truncate">{assignment.user_email}</p>
+                        <p className="text-xs text-slate-500 truncate">
+                          {assignment.internship ? `${assignment.internship.company} - ${assignment.internship.role}` : assignment.internship_id}
+                        </p>
+                      </div>
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider shrink-0">
+                        {new Date(assignment.assigned_at).toLocaleDateString("en-GB")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 3. All Listings */}
+            <div className="glass-card rounded-2xl p-8 space-y-6">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-gold-light" />
+                All Listings
+                <span className="ml-1 text-xs font-medium px-2 py-0.5 rounded-full bg-gold/10 text-gold-light border border-gold/20">
+                  {internships.length}
+                </span>
+              </h2>
+
+              {internships.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">
+                  No internships yet. Published listings appear on the homepage automatically.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+                  {internships.map((row) => (
+                    <div key={row.id} className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/3 hover:bg-white/6 transition-colors gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-slate-200 truncate">{row.role}</p>
+                        <p className="text-xs text-slate-500 truncate">{row.company}</p>
+                        <span
+                          className={`inline-block mt-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                            row.is_active
+                              ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+                              : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                          }`}
+                        >
+                          {row.is_active ? "Live" : "Hidden"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleEditInternship(row)}
+                          className="p-2 rounded-lg bg-electric/10 text-electric-light hover:bg-electric/20 transition-colors"
+                          aria-label={`Edit ${row.role}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteInternship(row.id)}
+                          className="p-2 rounded-lg bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-colors"
+                          aria-label={`Delete ${row.role}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
