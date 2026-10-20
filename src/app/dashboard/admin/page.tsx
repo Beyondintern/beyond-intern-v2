@@ -27,6 +27,8 @@ import {
   Newspaper,
   ExternalLink,
   Briefcase,
+  FileText,
+  RotateCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +60,9 @@ import {
   fetchInternships,
   assignInternship,
   getInternshipAssignments,
+  resendPlacementReceipt,
+  updateAssignmentStatus,
+  saveAdminNotes,
 } from "./actions";
 import type { InternshipRow, InternshipAssignmentRow } from "./actions";
 import type { CarouselImageRow, BrandPartnerRow, PressArticleRow } from "./actions";
@@ -200,6 +205,7 @@ export default function AdminPage() {
     id: "",
     company: "",
     role: "",
+    listing_type: "Job Placement" as "Job Placement" | "Internship",
     location: "",
     employment_type: "",
     pay_rate: "",
@@ -217,7 +223,10 @@ export default function AdminPage() {
   const [internshipMsg, setInternshipMsg] = useState("");
   const [assignEmail, setAssignEmail] = useState("");
   const [assignInternshipId, setAssignInternshipId] = useState("");
+  const [assignAmount, setAssignAmount] = useState("");
   const [internshipAssignments, setInternshipAssignments] = useState<InternshipAssignmentRow[]>([]);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [notesDrafts, setNotesDrafts] = useState<Record<string, string>>({});
 
   const isAdmin =
     session?.user?.email && ADMIN_EMAILS.includes(session.user.email);
@@ -549,6 +558,7 @@ export default function AdminPage() {
       id: editingInternship ?? undefined,
       company: internshipForm.company,
       role: internshipForm.role,
+      listing_type: internshipForm.listing_type,
       location: internshipForm.location,
       employment_type: internshipForm.employment_type,
       pay_rate: internshipForm.pay_rate,
@@ -564,7 +574,7 @@ export default function AdminPage() {
     if (result.success) {
       setInternshipMsg(editingInternship ? "Internship updated successfully!" : "Internship published successfully!");
       setInternshipStatus("success");
-      setInternshipForm({ id: "", company: "", role: "", location: "", employment_type: "", pay_rate: "", experience: "", shift: "", description: "", responsibilities: "", requirements: "", benefits: "", service_fee: "", is_active: true });
+      setInternshipForm({ id: "", company: "", role: "", listing_type: "Job Placement", location: "", employment_type: "", pay_rate: "", experience: "", shift: "", description: "", responsibilities: "", requirements: "", benefits: "", service_fee: "", is_active: true });
       setEditingInternship(null);
       loadInternships();
     } else {
@@ -578,6 +588,7 @@ export default function AdminPage() {
       id: row.id,
       company: row.company,
       role: row.role,
+      listing_type: row.listing_type ?? "Job Placement",
       location: row.location ?? "",
       employment_type: row.employment_type ?? "",
       pay_rate: row.pay_rate ?? "",
@@ -605,12 +616,13 @@ export default function AdminPage() {
     if (!assignEmail || !assignInternshipId) return;
     setInternshipStatus("loading");
     setInternshipMsg("");
-    const result = await assignInternship(assignEmail, assignInternshipId);
+    const result = await assignInternship(assignEmail, assignInternshipId, assignAmount || undefined);
     if (result.success) {
-      setInternshipMsg(`Assigned to ${assignEmail.trim().toLowerCase()} successfully.`);
+      setInternshipMsg(`Assigned to ${assignEmail.trim().toLowerCase()}. ${result.message ?? ""}`);
       setInternshipStatus("success");
       setAssignEmail("");
       setAssignInternshipId("");
+      setAssignAmount("");
       loadInternships();
     } else {
       setInternshipMsg(result.message || "Failed to assign internship.");
@@ -1838,6 +1850,18 @@ export default function AdminPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
+                    <label htmlFor="int-listing-type" className="text-xs font-medium text-slate-400">Listing Type</label>
+                    <select
+                      id="int-listing-type"
+                      value={internshipForm.listing_type}
+                      onChange={(e) => setInternshipForm({ ...internshipForm, listing_type: e.target.value as "Job Placement" | "Internship" })}
+                      className="h-11 w-full rounded-xl bg-white/5 border border-white/10 text-white px-3 text-sm focus:outline-none focus:border-electric/50"
+                    >
+                      <option value="Job Placement" className="bg-slate-900">Job Placement</option>
+                      <option value="Internship" className="bg-slate-900">Internship</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
                     <label htmlFor="int-location" className="text-xs font-medium text-slate-400">Location</label>
                     <Input
                       id="int-location"
@@ -1971,7 +1995,7 @@ export default function AdminPage() {
                       variant="outline"
                       onClick={() => {
                         setEditingInternship(null);
-                        setInternshipForm({ id: "", company: "", role: "", location: "", employment_type: "", pay_rate: "", experience: "", shift: "", description: "", responsibilities: "", requirements: "", benefits: "", service_fee: "", is_active: true });
+                        setInternshipForm({ id: "", company: "", role: "", listing_type: "Job Placement", location: "", employment_type: "", pay_rate: "", experience: "", shift: "", description: "", responsibilities: "", requirements: "", benefits: "", service_fee: "", is_active: true });
                       }}
                       className="h-11 rounded-xl border-white/15 text-slate-300 hover:bg-white/5"
                     >
@@ -1983,57 +2007,171 @@ export default function AdminPage() {
             </div>
 
             {/* 2. Assign to Student */}
-            <div className="glass-card rounded-2xl p-8 space-y-6">
+            <div className="glass-card rounded-2xl p-6 sm:p-8 space-y-6">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <UserPlus className="h-5 w-5 text-emerald" />
                 Assign to Student
               </h2>
-              <form onSubmit={handleAssignInternship} className="flex flex-col sm:flex-row gap-3">
-                <Input
-                  type="email"
-                  placeholder="student@example.com"
-                  value={assignEmail}
-                  onChange={(e) => setAssignEmail(e.target.value)}
-                  required
-                  className="flex-1 h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
-                />
-                <select
-                  value={assignInternshipId}
-                  onChange={(e) => setAssignInternshipId(e.target.value)}
-                  required
-                  className="h-11 rounded-xl bg-white/5 border border-white/10 text-white px-3 text-sm focus:outline-none focus:border-electric/50"
-                >
-                  <option value="" className="bg-slate-900">Select internship...</option>
-                  {internships.map((row) => (
-                    <option key={row.id} value={row.id} className="bg-slate-900">
-                      {row.company} - {row.role}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  type="submit"
-                  disabled={internshipStatus === "loading" || !assignEmail || !assignInternshipId}
-                  className="h-11 px-6 gradient-electric text-white font-semibold rounded-xl glow-blue hover:opacity-90 active:scale-[0.98] transition-all shrink-0"
-                >
-                  <UserPlus className="mr-2 h-4 w-4" /> Assign
-                </Button>
+              <form onSubmit={handleAssignInternship} className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Input
+                    type="email"
+                    placeholder="student@example.com"
+                    value={assignEmail}
+                    onChange={(e) => setAssignEmail(e.target.value)}
+                    required
+                    className="flex-1 h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                  />
+                  <select
+                    value={assignInternshipId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setAssignInternshipId(id);
+                      // Auto-fill the receipt amount from the selected listing's fee.
+                      const selected = internships.find((row) => row.id === id);
+                      const fee = selected?.service_fee?.match(/£\s?\d[\d,]*/)?.[0]?.replace(/\s+/, "");
+                      setAssignAmount(fee ?? "");
+                    }}
+                    required
+                    className="h-11 rounded-xl bg-white/5 border border-white/10 text-white px-3 text-sm focus:outline-none focus:border-electric/50"
+                  >
+                    <option value="" className="bg-slate-900">Select placement...</option>
+                    {internships.map((row) => (
+                      <option key={row.id} value={row.id} className="bg-slate-900">
+                        [{row.listing_type === "Internship" ? "Internship" : "Job"}] {row.company} - {row.role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Receipt amount (auto-filled, e.g. £300)"
+                      value={assignAmount}
+                      onChange={(e) => setAssignAmount(e.target.value)}
+                      className="h-11 w-full bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-electric/50 rounded-xl"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={internshipStatus === "loading" || !assignEmail || !assignInternshipId}
+                    className="h-11 px-6 gradient-electric text-white font-semibold rounded-xl glow-blue hover:opacity-90 active:scale-[0.98] transition-all shrink-0 w-full sm:w-auto"
+                  >
+                    <UserPlus className="mr-2 h-4 w-4" /> Assign &amp; Send Receipt
+                  </Button>
+                </div>
               </form>
 
               {internshipAssignments.length > 0 && (
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-                  {internshipAssignments.map((assignment) => (
-                    <div key={assignment.id} className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/3 hover:bg-white/6 transition-colors gap-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-300 truncate">{assignment.user_email}</p>
-                        <p className="text-xs text-slate-500 truncate">
-                          {assignment.internship ? `${assignment.internship.company} - ${assignment.internship.role}` : assignment.internship_id}
-                        </p>
+                <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
+                  {internshipAssignments.map((assignment) => {
+                    const statusLabel = (assignment.status ?? "assigned").replace(/_/g, " ");
+                    return (
+                      <div key={assignment.id} className="rounded-xl bg-white/3 hover:bg-white/6 transition-colors p-4 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{assignment.user_email}</p>
+                            <p className="text-xs text-slate-500 truncate">
+                              {assignment.internship ? `${assignment.internship.company} - ${assignment.internship.role}` : assignment.internship_id}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {assignment.receipt_number && (
+                              <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-gold/10 text-gold-light border border-gold/20">
+                                {assignment.receipt_number}
+                              </span>
+                            )}
+                            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-electric/10 text-electric-light border border-electric/20">
+                              {statusLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {assignment.cv_url ? (
+                            <a
+                              href={`/api/placement-cv?id=${assignment.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+                            >
+                              <FileText className="h-3.5 w-3.5" /> Download / View CV
+                            </a>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-full bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                              Awaiting CV
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            disabled={resendingId === assignment.id}
+                            onClick={async () => {
+                              setResendingId(assignment.id);
+                              const r = await resendPlacementReceipt(assignment.id);
+                              setInternshipMsg(r.message ?? "");
+                              setInternshipStatus(r.success ? "success" : "error");
+                              setResendingId(null);
+                              loadInternships();
+                            }}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-gold/10 text-gold-light border border-gold/20 hover:bg-gold/20 transition-colors disabled:opacity-50"
+                          >
+                            <RotateCw className={`h-3.5 w-3.5 ${resendingId === assignment.id ? "animate-spin" : ""}`} /> Resend Receipt
+                          </button>
+                        </div>
+
+                        {assignment.cv_submitted_at && (
+                          <p className="text-[11px] text-slate-500">
+                            CV uploaded {new Date(assignment.cv_submitted_at).toLocaleDateString("en-GB")}
+                            {assignment.cv_file_name ? ` - ${assignment.cv_file_name}` : ""}
+                          </p>
+                        )}
+                        {assignment.candidate_notes && (
+                          <p className="text-xs text-slate-400 bg-white/3 border border-white/8 rounded-lg px-3 py-2">
+                            <span className="text-slate-500">Student note: </span>{assignment.candidate_notes}
+                          </p>
+                        )}
+
+                        {/* Status + notes controls */}
+                        <div className="grid gap-3 sm:grid-cols-[auto,1fr] items-start">
+                          <select
+                            value={assignment.status}
+                            onChange={async (e) => {
+                              const r = await updateAssignmentStatus(assignment.id, e.target.value);
+                              setInternshipStatus(r.success ? "success" : "error");
+                              setInternshipMsg(r.success ? `Status set to ${e.target.value.replace(/_/g, " ")}.` : (r.message ?? "Failed."));
+                              loadInternships();
+                            }}
+                            className="h-10 rounded-xl bg-white/5 border border-white/10 text-white px-3 text-xs focus:outline-none focus:border-electric/50"
+                          >
+                            {["assigned", "cv_submitted", "under_review", "employer_stage"].map((s) => (
+                              <option key={s} value={s} className="bg-slate-900">{s.replace(/_/g, " ")}</option>
+                            ))}
+                          </select>
+                          <div className="flex gap-2">
+                            <textarea
+                              placeholder="Message to student (interview link, CV feedback, shift confirmation)..."
+                              value={notesDrafts[assignment.id] ?? assignment.admin_notes ?? ""}
+                              onChange={(e) => setNotesDrafts((prev) => ({ ...prev, [assignment.id]: e.target.value }))}
+                              rows={2}
+                              className="flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-electric/50 focus:outline-none resize-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const r = await saveAdminNotes(assignment.id, notesDrafts[assignment.id] ?? "");
+                                setInternshipStatus(r.success ? "success" : "error");
+                                setInternshipMsg(r.success ? "Update sent to student." : (r.message ?? "Failed."));
+                                loadInternships();
+                              }}
+                              className="self-end inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg gradient-electric text-white hover:opacity-90 transition-opacity"
+                            >
+                              <Mail className="h-3.5 w-3.5" /> Save &amp; Notify
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider shrink-0">
-                        {new Date(assignment.assigned_at).toLocaleDateString("en-GB")}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

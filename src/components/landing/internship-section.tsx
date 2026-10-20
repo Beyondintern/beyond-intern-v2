@@ -26,6 +26,7 @@ const FALLBACK_INTERNSHIPS: InternshipRow[] = [
     id: "seed-amazon-uk",
     company: "Amazon UK Services Ltd.",
     role: "Warehouse Operative / Fulfilment Associate",
+    listing_type: "Job Placement",
     location: "United Kingdom",
     employment_type: "Part-Time / Full-Time",
     pay_rate: "£15.10 - £16.10 per hour",
@@ -61,6 +62,7 @@ const FALLBACK_INTERNSHIPS: InternshipRow[] = [
     id: "seed-tesco-uk",
     company: "Tesco Stores Ltd.",
     role: "Store Colleague / Customer Assistant",
+    listing_type: "Job Placement",
     location: "United Kingdom",
     employment_type: "Part-Time / Full-Time, subject to vacancy",
     pay_rate: "From £13.28 per hour (£14.55 within the M25)",
@@ -116,7 +118,7 @@ function InternshipCard({ internship, index }: { internship: InternshipRow; inde
       {/* Double-bezel: outer shell + inner core with concentric radii */}
       <div
         onPointerMove={trackSpotlight}
-        className="glass-card spotlight-card rounded-[1.75rem] overflow-hidden group"
+        className="glass-card spotlight-card rounded-[1.75rem] overflow-hidden group min-w-0 w-full"
       >
         {/* Company monogram header band */}
         <div className="relative bg-linear-to-r from-electric/25 via-navy-light to-gold/15 flex items-center px-4 sm:px-7 py-4 sm:h-20 overflow-hidden gap-3 sm:gap-4">
@@ -133,9 +135,20 @@ function InternshipCard({ internship, index }: { internship: InternshipRow; inde
               </span>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-[11px] font-medium text-slate-300 uppercase tracking-[0.14em] sm:tracking-[0.18em] truncate">
-                {internship.company}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] sm:text-[11px] font-medium text-slate-300 uppercase tracking-[0.14em] sm:tracking-[0.18em] truncate">
+                  {internship.company}
+                </p>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[8px] sm:text-[9px] font-bold uppercase tracking-wider ${
+                    internship.listing_type === "Internship"
+                      ? "bg-gold/15 border border-gold/30 text-gold-light"
+                      : "bg-electric/15 border border-electric/30 text-electric-light"
+                  }`}
+                >
+                  {internship.listing_type === "Internship" ? "Internship" : "Job"}
+                </span>
+              </div>
               <h3 className="text-sm sm:text-lg font-bold text-white leading-snug line-clamp-2">
                 {internship.role}
               </h3>
@@ -154,11 +167,11 @@ function InternshipCard({ internship, index }: { internship: InternshipRow; inde
 
         <div className="p-4 sm:p-7">
           {/* Fact chips */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2.5">
             {facts.map((fact) => (
               <div
                 key={fact.label}
-                className="flex items-center gap-2.5 rounded-xl bg-white/4 border border-white/8 px-3.5 py-2.5"
+                className="flex items-center gap-2.5 rounded-xl bg-white/4 border border-white/8 px-3.5 py-2.5 min-w-0"
               >
                 <fact.icon className="h-4 w-4 text-electric-light shrink-0" aria-hidden="true" />
                 <span className="text-xs text-slate-300 leading-snug">{fact.label}</span>
@@ -280,9 +293,10 @@ export function InternshipSection() {
   useEffect(() => {
     async function load() {
       try {
+        // The internships table self-seeds on first fetch, so this returns
+        // the two launch listings (Amazon UK, Tesco UK) with real UUIDs even
+        // on a fresh database. The local pair above is a render fallback only.
         const data = await fetchInternships();
-        // Only replace the seed listings when live rows exist; otherwise
-        // the curated pair above keeps the section presentable.
         const active = data.filter((row) => row.is_active);
         if (active.length > 0) setInternships(active);
       } catch {
@@ -326,15 +340,16 @@ export function InternshipSection() {
           </p>
         </motion.div>
 
-        {/* Cards */}
-        <div className="grid gap-6 sm:gap-8 lg:grid-cols-2 items-start">
+        {/* Cards — minmax(0,1fr) lets each track shrink below content max-width so
+            long chip labels wrap instead of forcing the column (and page) wider */}
+        <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start">
           {loading ? (
             <>
               {[0, 1].map((i) => (
                 <div key={i} className="glass-card rounded-[1.75rem] overflow-hidden" aria-hidden="true">
                   <div className="skeleton-shimmer h-20" />
                   <div className="p-4 sm:p-7 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2.5">
                       <div className="skeleton-shimmer h-11 rounded-xl" />
                       <div className="skeleton-shimmer h-11 rounded-xl" />
                       <div className="skeleton-shimmer h-11 rounded-xl" />

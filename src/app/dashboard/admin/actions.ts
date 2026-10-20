@@ -1,5 +1,6 @@
 "use server";
 
+import crypto from "node:crypto";
 import { requireAdmin, requireUser } from "@/lib/auth-guards";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { courseData } from "@/lib/courses";
@@ -92,10 +93,13 @@ export async function fetchPressArticles(): Promise<PressArticleRow[]> { try { c
 export async function insertPressArticle(publisher_name: string, article_link: string) { await guardAdmin(); try { const { error } = await supabaseAdmin.from("press_articles").insert({ publisher_name: publisher_name.trim(), article_link: article_link.trim() }); if (error) throw error; return { success: true }; } catch (error) { console.error("Insert press article error:", error); return { success: false, message: "Failed to add press article." }; } }
 export async function deletePressArticle(id: string) { await guardAdmin(); try { const { error } = await supabaseAdmin.from("press_articles").delete().eq("id", id); if (error) throw error; return { success: true }; } catch (error) { console.error("Delete press article error:", error); return { success: false, message: "Failed to delete press article." }; } }
 
+export type ListingType = "Job Placement" | "Internship";
+
 export interface InternshipRow {
   id: string;
   company: string;
   role: string;
+  listing_type: ListingType;
   location: string | null;
   employment_type: string | null;
   pay_rate: string | null;
@@ -114,6 +118,7 @@ interface InternshipInput {
   id?: string;
   company: string;
   role: string;
+  listing_type: ListingType;
   location: string;
   employment_type: string;
   pay_rate: string;
@@ -132,6 +137,7 @@ function parseInternshipInput(data: InternshipInput) {
   return {
     company: data.company.trim(),
     role: data.role.trim(),
+    listing_type: data.listing_type === "Internship" ? "Internship" : "Job Placement",
     location: data.location.trim() || null,
     employment_type: data.employment_type.trim() || null,
     pay_rate: data.pay_rate.trim() || null,
@@ -166,8 +172,329 @@ export async function upsertInternship(data: InternshipInput) {
 }
 
 export async function deleteInternship(id: string) { await guardAdmin(); try { const { error } = await supabaseAdmin.from("internships").delete().eq("id", id); if (error) throw error; return { success: true }; } catch (error) { console.error("Delete internship error:", error); return { success: false, message: "Failed to delete internship." }; } }
-export async function fetchInternships(): Promise<InternshipRow[]> { try { const { data, error } = await supabaseAdmin.from("internships").select("*").order("created_at", { ascending: false }); if (error) throw error; return (data ?? []) as InternshipRow[]; } catch (error) { console.error("Fetch internships error:", error); return []; } }
 
-export interface InternshipAssignmentRow { id: string; user_email: string; internship_id: string; assigned_at: string; internship: { company: string; role: string } | null; }
-export async function assignInternship(email: string, internshipId: string) { await guardAdmin(); try { const normalizedEmail = email.trim().toLowerCase(); const { error } = await supabaseAdmin.from("internship_assignments").insert({ user_email: normalizedEmail, internship_id: internshipId }); if (error) { if (error.code === "23505") return { success: false, message: "This user is already assigned to that internship." }; throw error; } const { data: internship } = await supabaseAdmin.from("internships").select("company, role").eq("id", internshipId).single(); if (internship) await supabaseAdmin.from("notifications").insert({ title: "Internship Assignment", message: `You have been assigned to the ${internship.role} internship at ${internship.company}. Check your dashboard for details.`, type: "direct", target_email: normalizedEmail }); return { success: true }; } catch (error) { console.error("Assign internship error:", error); return { success: false, message: "An unexpected error occurred. Please try again." }; } }
-export async function getInternshipAssignments(): Promise<InternshipAssignmentRow[]> { await guardAdmin(); try { const { data, error } = await supabaseAdmin.from("internship_assignments").select("id, user_email, internship_id, assigned_at, internships(company, role)").order("assigned_at", { ascending: false }); if (error) throw error; return ((data ?? []) as unknown as InternshipAssignmentRow[]).map((row) => ({ ...row, internship: Array.isArray(row.internship) ? row.internship[0] ?? null : row.internship })); } catch (error) { console.error("Get internship assignments error:", error); return []; } }
+// Seed data for the two launch listings — used to populate the DB when empty
+// so the public section and the admin dropdown always have live rows.
+const SEED_INTERNSHIPS: Array<Omit<InternshipRow, "id" | "created_at">> = [
+  {
+    company: "Amazon UK Services Ltd.",
+    role: "Warehouse Operative / Fulfilment Associate",
+    listing_type: "Job Placement",
+    location: "United Kingdom",
+    employment_type: "Part-Time / Full-Time",
+    pay_rate: "£15.10 - £16.10 per hour",
+    experience: "No previous experience required for some vacancies",
+    shift: "Day / Night shifts, subject to availability",
+    description: "Amazon is looking for reliable and motivated individuals to support its UK warehouse and fulfilment operations. Employees help ensure that customer orders are received, processed, packed, sorted and dispatched safely and efficiently.",
+    responsibilities: ["Receive, scan and sort incoming products", "Pick, pack and prepare customer orders for dispatch", "Load, unload and move packages safely", "Maintain workplace cleanliness and follow health and safety procedures", "Meet quality and productivity standards", "Work collaboratively with colleagues to meet daily operational targets"],
+    requirements: ["Must meet the applicable UK right-to-work requirements", "Ability to follow instructions and safety procedures", "Comfortable standing, walking and handling packages during shifts", "Good teamwork and time-management skills"],
+    benefits: ["Competitive hourly pay", "Training provided for eligible entry-level positions", "Potential access to employee benefits, pension and career-development programmes", "Opportunities to explore different operational roles"],
+    service_fee: "From £300 (application support service)",
+    is_active: true,
+  },
+  {
+    company: "Tesco Stores Ltd.",
+    role: "Store Colleague / Customer Assistant",
+    listing_type: "Job Placement",
+    location: "United Kingdom",
+    employment_type: "Part-Time / Full-Time, subject to vacancy",
+    pay_rate: "From £13.28 per hour (£14.55 within the M25)",
+    experience: "Entry-level opportunities available",
+    shift: "Morning / Afternoon / Evening / Twilight, subject to availability",
+    description: "Tesco is looking for friendly, reliable and customer-focused individuals to support its UK stores. The role involves helping customers, replenishing shelves, handling products and supporting daily store operations.",
+    responsibilities: ["Provide friendly and helpful customer service", "Replenish shelves and maintain product displays", "Assist customers with product enquiries", "Operate checkout facilities when required and trained", "Pick and prepare online customer orders", "Maintain cleanliness and follow health and safety procedures"],
+    requirements: ["Must meet UK right-to-work requirements", "Good communication and teamwork skills", "A positive and customer-focused attitude", "Willingness to work flexible shifts, including weekends where required"],
+    benefits: ["Competitive hourly pay", "Staff discount through the Tesco Clubcard scheme, subject to eligibility", "Holiday entitlement and pension benefits, subject to applicable terms", "Training and opportunities for career development"],
+    service_fee: "From £250 (application support service)",
+    is_active: true,
+  },
+];
+
+async function seedInternshipsIfEmpty(): Promise<boolean> {
+  const { count, error } = await supabaseAdmin
+    .from("internships")
+    .select("id", { count: "exact", head: true });
+  if (error) throw error;
+  if ((count ?? 0) > 0) return false;
+  const { error: insertError } = await supabaseAdmin.from("internships").insert(SEED_INTERNSHIPS);
+  if (insertError) throw insertError;
+  return true;
+}
+
+export async function fetchInternships(): Promise<InternshipRow[]> {
+  try {
+    // Auto-seed so the dropdown and public section always have rows.
+    await seedInternshipsIfEmpty();
+    const { data, error } = await supabaseAdmin.from("internships").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return ((data ?? []) as InternshipRow[]);
+  } catch (error) {
+    console.error("Fetch internships error:", error);
+    return [];
+  }
+}
+
+// ── Receipt + assignment plumbing ──────────────────────────────────────────
+
+function generateReceiptNumber(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  for (let i = 0; i < bytes.length; i++) code += alphabet[bytes[i] % alphabet.length];
+  const year = new Date().getFullYear();
+  return `BI-RCPT-${year}-${code}`;
+}
+
+function feeAmount(serviceFee: string | null): string {
+  if (!serviceFee) return "as agreed";
+  const match = serviceFee.match(/£\s?\d[\d,]*/);
+  return match ? match[0].replace(/\s+/, "") : serviceFee;
+}
+
+async function sendReceiptEmail(opts: {
+  email: string;
+  company: string;
+  role: string;
+  listingType: string;
+  payRate: string | null;
+  receiptNumber: string;
+  amountPaid: string;
+}): Promise<{ sent: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    return { sent: false, error: "RESEND_API_KEY not configured" };
+  }
+  try {
+    const { Resend } = await import("resend");
+    const { placementReceiptHtml } = await import("@/lib/placement-email");
+    const resend = new Resend(apiKey);
+    const date = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    const dashboardUrl = "https://www.beyondintern.com/dashboard/internships";
+    await resend.emails.send({
+      from: "Beyond Intern <info@beyondintern.com>",
+      to: opts.email,
+      subject: `Payment & Enrolment Confirmed: ${opts.company} — ${opts.role} (Receipt #${opts.receiptNumber})`,
+      html: placementReceiptHtml({
+        studentEmail: opts.email,
+        company: opts.company,
+        role: opts.role,
+        listingType: opts.listingType,
+        payRate: opts.payRate,
+        receiptNumber: opts.receiptNumber,
+        amountPaid: opts.amountPaid,
+        date,
+        dashboardUrl,
+      }),
+    });
+    return { sent: true };
+  } catch (error) {
+    console.error("[placement] Resend error:", error);
+    return { sent: false, error: error instanceof Error ? error.message : "email failed" };
+  }
+}
+
+export interface InternshipAssignmentRow {
+  id: string;
+  user_email: string;
+  internship_id: string;
+  assigned_at: string;
+  status: string;
+  receipt_number: string | null;
+  amount_paid: string | null;
+  cv_url: string | null;
+  cv_file_name: string | null;
+  cv_submitted_at: string | null;
+  candidate_notes: string | null;
+  admin_notes: string | null;
+  internship: { company: string; role: string; listing_type: string; pay_rate: string | null; service_fee: string | null } | null;
+}
+
+export async function assignInternship(email: string, internshipId: string, amountOverride?: string) {
+  await guardAdmin();
+  try {
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data: internship } = await supabaseAdmin
+      .from("internships")
+      .select("company, role, listing_type, pay_rate, service_fee")
+      .eq("id", internshipId)
+      .single();
+    if (!internship) return { success: false, message: "Internship not found." };
+
+    const amountPaid = (amountOverride ?? "").trim() || feeAmount(internship.service_fee);
+    let receiptNumber = generateReceiptNumber();
+
+    // Retry once on the (astronomically unlikely) unique-collision.
+    let insertError = null as { code?: string; message?: string } | null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const { error } = await supabaseAdmin.from("internship_assignments").insert({
+        user_email: normalizedEmail,
+        internship_id: internshipId,
+        receipt_number: receiptNumber,
+        amount_paid: amountPaid,
+        status: "assigned",
+      });
+      if (!error) { insertError = null; break; }
+      if (error.code === "23505") {
+        if ((error.message ?? "").includes("receipt_number")) { receiptNumber = generateReceiptNumber(); continue; }
+        return { success: false, message: "This user is already assigned to that internship." };
+      }
+      insertError = error;
+      break;
+    }
+    if (insertError) throw insertError;
+
+    // In-app notification
+    await supabaseAdmin.from("notifications").insert({
+      title: "Placement Confirmed",
+      message: `You have been assigned to the ${internship.role} placement at ${internship.company}. Upload your CV on your dashboard to begin.`,
+      type: "direct",
+      target_email: normalizedEmail,
+    });
+
+    // Transactional receipt email (non-blocking on failure)
+    const emailResult = await sendReceiptEmail({
+      email: normalizedEmail,
+      company: internship.company,
+      role: internship.role,
+      listingType: internship.listing_type ?? "Job Placement",
+      payRate: internship.pay_rate,
+      receiptNumber,
+      amountPaid,
+    });
+    if (emailResult.sent) {
+      await supabaseAdmin
+        .from("internship_assignments")
+        .update({ receipt_sent_at: new Date().toISOString() })
+        .eq("user_email", normalizedEmail)
+        .eq("internship_id", internshipId);
+    }
+
+    return {
+      success: true,
+      message: emailResult.sent
+        ? "Assigned and receipt emailed."
+        : `Assigned. Receipt email not sent (${emailResult.error}).`,
+      receiptNumber,
+      emailSent: emailResult.sent,
+    };
+  } catch (error) {
+    console.error("Assign internship error:", error);
+    return { success: false, message: "An unexpected error occurred. Please try again." };
+  }
+}
+
+export async function getInternshipAssignments(): Promise<InternshipAssignmentRow[]> {
+  await guardAdmin();
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("internship_assignments")
+      .select("id, user_email, internship_id, assigned_at, status, receipt_number, amount_paid, cv_url, cv_file_name, cv_submitted_at, candidate_notes, admin_notes, internships(company, role, listing_type, pay_rate, service_fee)")
+      .order("assigned_at", { ascending: false });
+    if (error) throw error;
+    return ((data ?? []) as unknown as InternshipAssignmentRow[]).map((row) => ({
+      ...row,
+      internship: Array.isArray(row.internship) ? row.internship[0] ?? null : row.internship,
+    }));
+  } catch (error) {
+    console.error("Get internship assignments error:", error);
+    return [];
+  }
+}
+
+export async function resendPlacementReceipt(assignmentId: string) {
+  await guardAdmin();
+  try {
+    const { data: row } = await supabaseAdmin
+      .from("internship_assignments")
+      .select("user_email, receipt_number, amount_paid, internships(company, role, listing_type, pay_rate)")
+      .eq("id", assignmentId)
+      .single();
+    if (!row) return { success: false, message: "Assignment not found." };
+    const internship = Array.isArray(row.internships) ? row.internships[0] : row.internships;
+    if (!internship) return { success: false, message: "Placement not found." };
+
+    const emailResult = await sendReceiptEmail({
+      email: row.user_email,
+      company: internship.company,
+      role: internship.role,
+      listingType: internship.listing_type ?? "Job Placement",
+      payRate: internship.pay_rate,
+      receiptNumber: row.receipt_number ?? generateReceiptNumber(),
+      amountPaid: row.amount_paid ?? "as agreed",
+    });
+    if (!emailResult.sent) return { success: false, message: `Email failed (${emailResult.error}).` };
+    await supabaseAdmin
+      .from("internship_assignments")
+      .update({ receipt_sent_at: new Date().toISOString() })
+      .eq("id", assignmentId);
+    return { success: true, message: "Receipt re-sent." };
+  } catch (error) {
+    console.error("Resend receipt error:", error);
+    return { success: false, message: "Failed to resend receipt." };
+  }
+}
+
+const PLACEMENT_STATUSES = ["assigned", "cv_submitted", "under_review", "employer_stage"] as const;
+
+export async function updateAssignmentStatus(assignmentId: string, status: string) {
+  await guardAdmin();
+  if (!(PLACEMENT_STATUSES as readonly string[]).includes(status)) {
+    return { success: false, message: "Invalid status." };
+  }
+  try {
+    const { data: row } = await supabaseAdmin
+      .from("internship_assignments")
+      .select("user_email, internships(role, company)")
+      .eq("id", assignmentId)
+      .single();
+    const { error } = await supabaseAdmin
+      .from("internship_assignments")
+      .update({ status })
+      .eq("id", assignmentId);
+    if (error) throw error;
+
+    if (row) {
+      const internship = Array.isArray(row.internships) ? row.internships[0] : row.internships;
+      const label = status.replace(/_/g, " ");
+      await supabaseAdmin.from("notifications").insert({
+        title: "Placement update",
+        message: `Your ${internship ? `${internship.role} placement at ${internship.company}` : "placement"} is now: ${label}.`,
+        type: "direct",
+        target_email: row.user_email,
+      });
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("Update assignment status error:", error);
+    return { success: false, message: "Failed to update status." };
+  }
+}
+
+export async function saveAdminNotes(assignmentId: string, adminNotes: string) {
+  await guardAdmin();
+  try {
+    const { data: row } = await supabaseAdmin
+      .from("internship_assignments")
+      .select("user_email")
+      .eq("id", assignmentId)
+      .single();
+    const { error } = await supabaseAdmin
+      .from("internship_assignments")
+      .update({ admin_notes: adminNotes.trim() || null })
+      .eq("id", assignmentId);
+    if (error) throw error;
+    if (row && adminNotes.trim()) {
+      await supabaseAdmin.from("notifications").insert({
+        title: "Message from the placement team",
+        message: adminNotes.trim(),
+        type: "direct",
+        target_email: row.user_email,
+      });
+    }
+    return { success: true };
+  } catch (error) {
+    console.error("Save admin notes error:", error);
+    return { success: false, message: "Failed to save notes." };
+  }
+}
