@@ -52,10 +52,10 @@ function AssignedInternshipCard({ internship, index }: { internship: MyInternshi
         className="glass-card spotlight-card rounded-[1.75rem] overflow-hidden"
       >
         {/* Company monogram header band */}
-        <div className="relative h-20 bg-linear-to-r from-electric/25 via-navy-light to-gold/15 flex items-center px-7 overflow-hidden">
+        <div className="relative bg-linear-to-r from-electric/25 via-navy-light to-gold/15 flex items-center px-4 sm:px-7 py-4 sm:h-20 overflow-hidden gap-3 sm:gap-4">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_50%,rgba(96,165,250,0.18),transparent_60%)]" />
-          <div className="relative z-10 flex items-center gap-4 min-w-0">
-            <div className="h-11 w-11 rounded-full glass-strong flex items-center justify-center shrink-0">
+          <div className="relative z-10 flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-full glass-strong flex items-center justify-center shrink-0">
               <span className="text-sm font-bold text-white tracking-wide">
                 {internship.company
                   .split(" ")
@@ -65,18 +65,18 @@ function AssignedInternshipCard({ internship, index }: { internship: MyInternshi
                   .join("")}
               </span>
             </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-slate-300 uppercase tracking-[0.18em] truncate">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-[11px] font-medium text-slate-300 uppercase tracking-[0.14em] sm:tracking-[0.18em] truncate">
                 {internship.company}
               </p>
-              <h2 className="text-base sm:text-lg font-bold text-white leading-snug truncate">
+              <h2 className="text-sm sm:text-lg font-bold text-white leading-snug line-clamp-2">
                 {internship.role}
               </h2>
             </div>
           </div>
         </div>
 
-        <div className="p-6 sm:p-7">
+        <div className="p-4 sm:p-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Badge className="rounded-full border-emerald/25 bg-emerald/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.2em] text-emerald">
               Assigned placement
@@ -179,10 +179,10 @@ function AssignedInternshipCard({ internship, index }: { internship: MyInternshi
           </motion.div>
 
           {/* CTA */}
-          <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex justify-end max-sm:flex-col">
             <a
               href="/contact"
-              className="group inline-flex items-center gap-3 rounded-full gradient-electric px-6 py-3 text-sm font-semibold text-white glow-blue transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:opacity-90 active:scale-[0.97]"
+              className="group inline-flex items-center justify-between sm:justify-start gap-3 rounded-full gradient-electric px-5 sm:px-6 py-3 text-sm font-semibold text-white glow-blue transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:opacity-90 active:scale-[0.97] w-full sm:w-auto"
             >
               <span className="whitespace-nowrap">Contact Placement Team</span>
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105">

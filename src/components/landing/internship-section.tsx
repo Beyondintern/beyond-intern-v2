@@ -119,10 +119,10 @@ function InternshipCard({ internship, index }: { internship: InternshipRow; inde
         className="glass-card spotlight-card rounded-[1.75rem] overflow-hidden group"
       >
         {/* Company monogram header band */}
-        <div className="relative h-20 bg-linear-to-r from-electric/25 via-navy-light to-gold/15 flex items-center px-7 overflow-hidden">
+        <div className="relative bg-linear-to-r from-electric/25 via-navy-light to-gold/15 flex items-center px-4 sm:px-7 py-4 sm:h-20 overflow-hidden gap-3 sm:gap-4">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_50%,rgba(96,165,250,0.18),transparent_60%)]" />
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="h-11 w-11 rounded-full glass-strong flex items-center justify-center shrink-0">
+          <div className="relative z-10 flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-full glass-strong flex items-center justify-center shrink-0">
               <span className="text-sm font-bold text-white tracking-wide">
                 {internship.company
                   .split(" ")
@@ -132,17 +132,17 @@ function InternshipCard({ internship, index }: { internship: InternshipRow; inde
                   .join("")}
               </span>
             </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-slate-300 uppercase tracking-[0.18em] truncate">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-[11px] font-medium text-slate-300 uppercase tracking-[0.14em] sm:tracking-[0.18em] truncate">
                 {internship.company}
               </p>
-              <h3 className="text-base sm:text-lg font-bold text-white leading-snug truncate">
+              <h3 className="text-sm sm:text-lg font-bold text-white leading-snug line-clamp-2">
                 {internship.role}
               </h3>
             </div>
           </div>
           {internship.is_active && (
-            <span className="absolute top-3 right-4 z-10 flex items-center gap-1.5 rounded-full bg-emerald/15 border border-emerald/25 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald">
+            <span className="relative z-10 flex items-center gap-1.5 rounded-full bg-emerald/15 border border-emerald/25 px-2.5 py-1 text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-emerald shrink-0">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-emerald opacity-75 animate-ping" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald" />
@@ -152,7 +152,7 @@ function InternshipCard({ internship, index }: { internship: InternshipRow; inde
           )}
         </div>
 
-        <div className="p-6 sm:p-7">
+        <div className="p-4 sm:p-7">
           {/* Fact chips */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {facts.map((fact) => (
@@ -250,17 +250,17 @@ function InternshipCard({ internship, index }: { internship: InternshipRow; inde
             </div>
           </motion.div>
 
-          {/* CTA — button-in-button trailing icon */}
-          <div className="mt-6 flex items-center justify-between gap-4">
-            <p className="text-[11px] text-slate-500">
+          {/* CTA — button-in-button trailing icon; stacks to full-width on mobile */}
+          <div className="mt-6 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-4">
+            <p className="text-[11px] text-slate-500 leading-relaxed sm:text-right sm:max-w-[45%]">
               Assigned directly to your dashboard after enrolment.
             </p>
             <a
               href="/contact"
-              className="group inline-flex items-center gap-3 rounded-full gradient-electric px-6 py-3 text-sm font-semibold text-white glow-blue transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:opacity-90 active:scale-[0.97]"
+              className="group inline-flex items-center justify-between sm:justify-start gap-3 rounded-full gradient-electric px-5 sm:px-6 py-3 text-sm font-semibold text-white glow-blue transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:opacity-90 active:scale-[0.97] w-full sm:w-auto"
             >
               <span className="whitespace-nowrap">Apply with Support</span>
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-1 group-hover:-translate-y-[1px] group-hover:scale-105">
                 <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
               </span>
             </a>
@@ -295,7 +295,7 @@ export function InternshipSection() {
   }, []);
 
   return (
-    <section id="internships" className="relative py-24 overflow-hidden">
+    <section id="internships" className="relative py-16 sm:py-24 overflow-hidden">
       <div className="absolute inset-0 bg-navy-light/40" aria-hidden="true" />
       <div
         className="absolute left-1/4 top-0 h-96 w-96 rounded-full bg-electric/6 blur-[140px]"
@@ -303,38 +303,38 @@ export function InternshipSection() {
       />
       <div className="absolute left-0 right-0 top-0 h-px bg-linear-to-r from-transparent via-electric/25 to-transparent" aria-hidden="true" />
 
-      <div className="relative mx-auto max-w-7xl px-6 lg:px-8">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 24, filter: "blur(6px)" }}
           whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, ease: [0.32, 0.72, 0, 1] }}
-          className="mb-14 max-w-2xl"
+          className="mb-10 sm:mb-14 max-w-2xl"
         >
-          <Badge className="mb-5 rounded-full border-emerald/25 bg-emerald/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.2em] text-emerald">
+          <Badge className="mb-4 sm:mb-5 rounded-full border-emerald/25 bg-emerald/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.2em] text-emerald">
             Placements & Internships
           </Badge>
-          <h2 className="text-3xl font-bold text-white sm:text-4xl leading-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white leading-tight">
             Real employers.
             <br />
             <span className="gradient-text">Real UK placements.</span>
           </h2>
-          <p className="mt-5 text-lg text-slate-400 leading-relaxed max-w-xl">
+          <p className="mt-4 sm:mt-5 text-base sm:text-lg text-slate-400 leading-relaxed max-w-xl">
             We work with recognised UK employers to place our learners into paid roles
             alongside their training, with dedicated application support at every step.
           </p>
         </motion.div>
 
         {/* Cards */}
-        <div className="grid gap-8 lg:grid-cols-2 items-start">
+        <div className="grid gap-6 sm:gap-8 lg:grid-cols-2 items-start">
           {loading ? (
             <>
               {[0, 1].map((i) => (
                 <div key={i} className="glass-card rounded-[1.75rem] overflow-hidden" aria-hidden="true">
                   <div className="skeleton-shimmer h-20" />
-                  <div className="p-7 space-y-4">
-                    <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-4 sm:p-7 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div className="skeleton-shimmer h-11 rounded-xl" />
                       <div className="skeleton-shimmer h-11 rounded-xl" />
                       <div className="skeleton-shimmer h-11 rounded-xl" />
@@ -361,20 +361,20 @@ export function InternshipSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.15, ease: [0.32, 0.72, 0, 1] }}
-          className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-[1.75rem] glass-card px-7 py-6"
+          className="mt-10 sm:mt-12 flex flex-col sm:flex-row sm:items-center justify-between gap-5 rounded-[1.75rem] glass-card px-5 sm:px-7 py-6"
         >
-          <div className="flex items-center gap-4">
+          <div className="flex items-start sm:items-center gap-4">
             <div className="h-11 w-11 rounded-full gradient-electric glow-blue flex items-center justify-center shrink-0">
               <GraduationCap className="h-5 w-5 text-white" aria-hidden="true" />
             </div>
-            <p className="text-sm text-slate-300 max-w-md">
+            <p className="text-sm text-slate-300 max-w-md leading-relaxed">
               Enrolled students are assigned internships directly on their dashboard by
               our placement team.
             </p>
           </div>
           <a
             href="/login"
-            className="group inline-flex items-center gap-2.5 rounded-full border border-white/15 px-6 py-3 text-sm font-semibold text-white transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/8 hover:border-white/25 active:scale-[0.97]"
+            className="group inline-flex items-center justify-center sm:justify-start gap-2.5 rounded-full border border-white/15 px-6 py-3 text-sm font-semibold text-white transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/8 hover:border-white/25 active:scale-[0.97] w-full sm:w-auto shrink-0"
           >
             Go to Dashboard
             <ArrowUpRight className="h-4 w-4 text-electric-light transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
