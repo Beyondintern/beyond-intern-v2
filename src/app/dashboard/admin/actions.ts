@@ -152,22 +152,41 @@ function parseInternshipInput(data: InternshipInput) {
   };
 }
 
+// Cached at module scope: whether the internships table has the listing_type
+// column yet (added by the internships.sql migration). When it doesn't, we
+// omit the field so inserts still succeed on the older schema.
+let listingTypeSupported: boolean | null = null;
+
+async function probeListingTypeColumn(): Promise<boolean> {
+  if (listingTypeSupported !== null) return listingTypeSupported;
+  try {
+    const { error } = await supabaseAdmin.from("internships").select("listing_type").limit(1);
+    listingTypeSupported = !error;
+  } catch {
+    listingTypeSupported = false;
+  }
+  return listingTypeSupported;
+}
+
 export async function upsertInternship(data: InternshipInput) {
   await guardAdmin();
   try {
     const parsed = parseInternshipInput(data);
     if (!parsed.company || !parsed.role) return { success: false, message: "Company and role are required." };
-    if (data.id) {
-      const { error } = await supabaseAdmin.from("internships").update(parsed).eq("id", data.id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabaseAdmin.from("internships").insert(parsed);
-      if (error) throw error;
+    if (!(await probeListingTypeColumn())) {
+      delete (parsed as Record<string, unknown>).listing_type;
+    }
+    const { error } = data.id
+      ? await supabaseAdmin.from("internships").update(parsed).eq("id", data.id)
+      : await supabaseAdmin.from("internships").insert(parsed);
+    if (error) {
+      console.error("Upsert internship error:", error);
+      return { success: false, message: error.message ?? "Failed to save internship." };
     }
     return { success: true };
   } catch (error) {
-    console.error("Upsert internship error:", error);
-    return { success: false, message: "Failed to save internship." };
+    console.error("Upsert internship exception:", error);
+    return { success: false, message: error instanceof Error ? error.message : "Failed to save internship." };
   }
 }
 
@@ -210,24 +229,48 @@ const SEED_INTERNSHIPS: Array<Omit<InternshipRow, "id" | "created_at">> = [
   },
 ];
 
-async function seedInternshipsIfEmpty(): Promise<boolean> {
-  const { count, error } = await supabaseAdmin
-    .from("internships")
-    .select("id", { count: "exact", head: true });
-  if (error) throw error;
-  if ((count ?? 0) > 0) return false;
-  const { error: insertError } = await supabaseAdmin.from("internships").insert(SEED_INTERNSHIPS);
-  if (insertError) throw insertError;
-  return true;
+export async function seedInternshipsIfEmpty(): Promise<{ success: boolean; seeded?: boolean; message?: string }> {
+  await guardAdmin();
+  try {
+    const { count, error } = await supabaseAdmin
+      .from("internships")
+      .select("id", { count: "exact", head: true });
+    if (error) throw error;
+    if ((count ?? 0) > 0) return { success: true, seeded: false, message: "Listings already exist." };
+    // Omit listing_type if the migration column isn't present yet.
+    const rows = (await probeListingTypeColumn())
+      ? SEED_INTERNSHIPS
+      : SEED_INTERNSHIPS.map((row) => {
+          const rest = { ...row } as Record<string, unknown>;
+          delete rest.listing_type;
+          return rest;
+        });
+    const { error: insertError } = await supabaseAdmin.from("internships").insert(rows);
+    if (insertError) throw insertError;
+    return { success: true, seeded: true, message: "Seeded the two launch listings." };
+  } catch (error) {
+    console.error("Seed internships error:", error);
+    return { success: false, message: error instanceof Error ? error.message : "Seeding failed." };
+  }
+}
+
+export interface InternshipsResult {
+  rows: InternshipRow[];
+  error: string | null;
 }
 
 export async function fetchInternships(): Promise<InternshipRow[]> {
   try {
-    // Auto-seed so the dropdown and public section always have rows.
-    await seedInternshipsIfEmpty();
+    // Read only — seeding is a separate explicit admin action. A plain
+    // select keeps behaviour identical to the working admin tabs.
     const { data, error } = await supabaseAdmin.from("internships").select("*").order("created_at", { ascending: false });
     if (error) throw error;
-    return ((data ?? []) as InternshipRow[]);
+    // Normalize listing_type so the card badge never sees undefined on the
+    // pre-migration schema.
+    return ((data ?? []) as InternshipRow[]).map((row) => ({
+      ...row,
+      listing_type: row.listing_type ?? "Job Placement",
+    }));
   } catch (error) {
     console.error("Fetch internships error:", error);
     return [];
@@ -314,11 +357,13 @@ export async function assignInternship(email: string, internshipId: string, amou
   await guardAdmin();
   try {
     const normalizedEmail = email.trim().toLowerCase();
-    const { data: internship } = await supabaseAdmin
+    const { data: internshipRows, error: lookupError } = await supabaseAdmin
       .from("internships")
       .select("company, role, listing_type, pay_rate, service_fee")
       .eq("id", internshipId)
-      .single();
+      .limit(1);
+    if (lookupError) throw lookupError;
+    const internship = internshipRows?.[0];
     if (!internship) return { success: false, message: "Internship not found." };
 
     const amountPaid = (amountOverride ?? "").trim() || feeAmount(internship.service_fee);
@@ -405,11 +450,13 @@ export async function getInternshipAssignments(): Promise<InternshipAssignmentRo
 export async function resendPlacementReceipt(assignmentId: string) {
   await guardAdmin();
   try {
-    const { data: row } = await supabaseAdmin
+    const { data: rows, error: fetchErr } = await supabaseAdmin
       .from("internship_assignments")
       .select("user_email, receipt_number, amount_paid, internships(company, role, listing_type, pay_rate)")
       .eq("id", assignmentId)
-      .single();
+      .limit(1);
+    if (fetchErr) throw fetchErr;
+    const row = rows?.[0];
     if (!row) return { success: false, message: "Assignment not found." };
     const internship = Array.isArray(row.internships) ? row.internships[0] : row.internships;
     if (!internship) return { success: false, message: "Placement not found." };
@@ -443,11 +490,13 @@ export async function updateAssignmentStatus(assignmentId: string, status: strin
     return { success: false, message: "Invalid status." };
   }
   try {
-    const { data: row } = await supabaseAdmin
+    const { data: statusRows, error: statusFetchErr } = await supabaseAdmin
       .from("internship_assignments")
       .select("user_email, internships(role, company)")
       .eq("id", assignmentId)
-      .single();
+      .limit(1);
+    if (statusFetchErr) throw statusFetchErr;
+    const row = statusRows?.[0];
     const { error } = await supabaseAdmin
       .from("internship_assignments")
       .update({ status })
@@ -474,11 +523,13 @@ export async function updateAssignmentStatus(assignmentId: string, status: strin
 export async function saveAdminNotes(assignmentId: string, adminNotes: string) {
   await guardAdmin();
   try {
-    const { data: row } = await supabaseAdmin
+    const { data: noteRows, error: noteFetchErr } = await supabaseAdmin
       .from("internship_assignments")
       .select("user_email")
       .eq("id", assignmentId)
-      .single();
+      .limit(1);
+    if (noteFetchErr) throw noteFetchErr;
+    const row = noteRows?.[0];
     const { error } = await supabaseAdmin
       .from("internship_assignments")
       .update({ admin_notes: adminNotes.trim() || null })
