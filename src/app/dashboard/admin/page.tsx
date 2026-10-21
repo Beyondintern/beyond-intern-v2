@@ -58,6 +58,7 @@ import {
   upsertInternship,
   deleteInternship,
   fetchInternships,
+  seedInternshipsIfEmpty,
   assignInternship,
   getInternshipAssignments,
   resendPlacementReceipt,
@@ -260,13 +261,35 @@ export default function AdminPage() {
   }, []);
 
   const loadInternships = useCallback(async () => {
-    const [rows, assignments] = await Promise.all([
-      fetchInternships(),
-      getInternshipAssignments(),
-    ]);
-    setInternships(rows);
-    setInternshipAssignments(assignments);
+    try {
+      const [rows, assignments] = await Promise.all([
+        fetchInternships(),
+        getInternshipAssignments(),
+      ]);
+      setInternships(rows);
+      setInternshipAssignments(assignments);
+    } catch (err) {
+      console.error("Failed to load internships:", err);
+      setInternshipStatus("error");
+      setInternshipMsg(err instanceof Error ? err.message : "Could not load placements.");
+    }
   }, []);
+
+  async function handleSeedListings() {
+    setInternshipStatus("loading");
+    setInternshipMsg("");
+    try {
+      const result = await seedInternshipsIfEmpty();
+      setInternshipMsg(result.message ?? (result.success ? "Listings ready." : "Seeding failed."));
+      setInternshipStatus(result.success ? "success" : "error");
+      loadInternships();
+    } catch (err) {
+      setInternshipMsg(err instanceof Error ? err.message : "Seeding failed.");
+      setInternshipStatus("error");
+    } finally {
+      setInternshipStatus((prev) => (prev === "loading" ? "error" : prev));
+    }
+  }
 
   const loadCollabs = useCallback(async () => {
     const [images, brands, press] = await Promise.all([
@@ -554,32 +577,42 @@ export default function AdminPage() {
     if (!internshipForm.company || !internshipForm.role) return;
     setInternshipStatus("loading");
     setInternshipMsg("");
-    const result = await upsertInternship({
-      id: editingInternship ?? undefined,
-      company: internshipForm.company,
-      role: internshipForm.role,
-      listing_type: internshipForm.listing_type,
-      location: internshipForm.location,
-      employment_type: internshipForm.employment_type,
-      pay_rate: internshipForm.pay_rate,
-      experience: internshipForm.experience,
-      shift: internshipForm.shift,
-      description: internshipForm.description,
-      responsibilities: internshipForm.responsibilities,
-      requirements: internshipForm.requirements,
-      benefits: internshipForm.benefits,
-      service_fee: internshipForm.service_fee,
-      is_active: internshipForm.is_active,
-    });
-    if (result.success) {
-      setInternshipMsg(editingInternship ? "Internship updated successfully!" : "Internship published successfully!");
-      setInternshipStatus("success");
-      setInternshipForm({ id: "", company: "", role: "", listing_type: "Job Placement", location: "", employment_type: "", pay_rate: "", experience: "", shift: "", description: "", responsibilities: "", requirements: "", benefits: "", service_fee: "", is_active: true });
-      setEditingInternship(null);
-      loadInternships();
-    } else {
-      setInternshipMsg(result.message || "Failed to save internship.");
+    try {
+      const result = await upsertInternship({
+        id: editingInternship ?? undefined,
+        company: internshipForm.company,
+        role: internshipForm.role,
+        listing_type: internshipForm.listing_type,
+        location: internshipForm.location,
+        employment_type: internshipForm.employment_type,
+        pay_rate: internshipForm.pay_rate,
+        experience: internshipForm.experience,
+        shift: internshipForm.shift,
+        description: internshipForm.description,
+        responsibilities: internshipForm.responsibilities,
+        requirements: internshipForm.requirements,
+        benefits: internshipForm.benefits,
+        service_fee: internshipForm.service_fee,
+        is_active: internshipForm.is_active,
+      });
+      if (result.success) {
+        setInternshipMsg(editingInternship ? "Internship updated successfully!" : "Internship published successfully!");
+        setInternshipStatus("success");
+        setInternshipForm({ id: "", company: "", role: "", listing_type: "Job Placement", location: "", employment_type: "", pay_rate: "", experience: "", shift: "", description: "", responsibilities: "", requirements: "", benefits: "", service_fee: "", is_active: true });
+        setEditingInternship(null);
+        loadInternships();
+      } else {
+        setInternshipMsg(result.message || "Failed to save internship.");
+        setInternshipStatus("error");
+      }
+    } catch (err) {
+      setInternshipMsg(err instanceof Error ? err.message : "Save failed — check your connection and try again.");
       setInternshipStatus("error");
+    } finally {
+      // The button's loading text keys off internshipStatus === "loading", so
+      // always move off it — the statuses above already did, but this guarantees
+      // it even if a setState above throws.
+      setInternshipStatus((prev) => (prev === "loading" ? "error" : prev));
     }
   }
 
@@ -616,17 +649,24 @@ export default function AdminPage() {
     if (!assignEmail || !assignInternshipId) return;
     setInternshipStatus("loading");
     setInternshipMsg("");
-    const result = await assignInternship(assignEmail, assignInternshipId, assignAmount || undefined);
-    if (result.success) {
-      setInternshipMsg(`Assigned to ${assignEmail.trim().toLowerCase()}. ${result.message ?? ""}`);
-      setInternshipStatus("success");
-      setAssignEmail("");
-      setAssignInternshipId("");
-      setAssignAmount("");
-      loadInternships();
-    } else {
-      setInternshipMsg(result.message || "Failed to assign internship.");
+    try {
+      const result = await assignInternship(assignEmail, assignInternshipId, assignAmount || undefined);
+      if (result.success) {
+        setInternshipMsg(`Assigned to ${assignEmail.trim().toLowerCase()}. ${result.message ?? ""}`);
+        setInternshipStatus("success");
+        setAssignEmail("");
+        setAssignInternshipId("");
+        setAssignAmount("");
+        loadInternships();
+      } else {
+        setInternshipMsg(result.message || "Failed to assign internship.");
+        setInternshipStatus("error");
+      }
+    } catch (err) {
+      setInternshipMsg(err instanceof Error ? err.message : "Assignment failed — check your connection and try again.");
       setInternshipStatus("error");
+    } finally {
+      setInternshipStatus((prev) => (prev === "loading" ? "error" : prev));
     }
   }
 
@@ -2107,11 +2147,17 @@ export default function AdminPage() {
                             disabled={resendingId === assignment.id}
                             onClick={async () => {
                               setResendingId(assignment.id);
-                              const r = await resendPlacementReceipt(assignment.id);
-                              setInternshipMsg(r.message ?? "");
-                              setInternshipStatus(r.success ? "success" : "error");
-                              setResendingId(null);
-                              loadInternships();
+                              try {
+                                const r = await resendPlacementReceipt(assignment.id);
+                                setInternshipMsg(r.message ?? "");
+                                setInternshipStatus(r.success ? "success" : "error");
+                                loadInternships();
+                              } catch (err) {
+                                setInternshipMsg(err instanceof Error ? err.message : "Resend failed.");
+                                setInternshipStatus("error");
+                              } finally {
+                                setResendingId(null);
+                              }
                             }}
                             className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-gold/10 text-gold-light border border-gold/20 hover:bg-gold/20 transition-colors disabled:opacity-50"
                           >
@@ -2136,10 +2182,15 @@ export default function AdminPage() {
                           <select
                             value={assignment.status}
                             onChange={async (e) => {
-                              const r = await updateAssignmentStatus(assignment.id, e.target.value);
-                              setInternshipStatus(r.success ? "success" : "error");
-                              setInternshipMsg(r.success ? `Status set to ${e.target.value.replace(/_/g, " ")}.` : (r.message ?? "Failed."));
-                              loadInternships();
+                              try {
+                                const r = await updateAssignmentStatus(assignment.id, e.target.value);
+                                setInternshipStatus(r.success ? "success" : "error");
+                                setInternshipMsg(r.success ? `Status set to ${e.target.value.replace(/_/g, " ")}.` : (r.message ?? "Failed."));
+                                loadInternships();
+                              } catch (err) {
+                                setInternshipStatus("error");
+                                setInternshipMsg(err instanceof Error ? err.message : "Status update failed.");
+                              }
                             }}
                             className="h-10 rounded-xl bg-white/5 border border-white/10 text-white px-3 text-xs focus:outline-none focus:border-electric/50"
                           >
@@ -2158,10 +2209,15 @@ export default function AdminPage() {
                             <button
                               type="button"
                               onClick={async () => {
-                                const r = await saveAdminNotes(assignment.id, notesDrafts[assignment.id] ?? "");
-                                setInternshipStatus(r.success ? "success" : "error");
-                                setInternshipMsg(r.success ? "Update sent to student." : (r.message ?? "Failed."));
-                                loadInternships();
+                                try {
+                                  const r = await saveAdminNotes(assignment.id, notesDrafts[assignment.id] ?? "");
+                                  setInternshipStatus(r.success ? "success" : "error");
+                                  setInternshipMsg(r.success ? "Update sent to student." : (r.message ?? "Failed."));
+                                  loadInternships();
+                                } catch (err) {
+                                  setInternshipStatus("error");
+                                  setInternshipMsg(err instanceof Error ? err.message : "Save failed.");
+                                }
                               }}
                               className="self-end inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg gradient-electric text-white hover:opacity-90 transition-opacity"
                             >
@@ -2187,9 +2243,19 @@ export default function AdminPage() {
               </h2>
 
               {internships.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-4">
-                  No internships yet. Published listings appear on the homepage automatically.
-                </p>
+                <div className="text-center py-6 space-y-4">
+                  <p className="text-sm text-slate-500">
+                    No internships in the database yet. Seed the two launch listings (Amazon UK, Tesco UK) or create one above.
+                  </p>
+                  <Button
+                    type="button"
+                    onClick={handleSeedListings}
+                    disabled={internshipStatus === "loading"}
+                    className="h-11 px-6 gradient-electric text-white font-semibold rounded-xl glow-blue hover:opacity-90 active:scale-[0.98] transition-all"
+                  >
+                    {internshipStatus === "loading" ? "Seeding..." : "Seed Amazon UK & Tesco UK"}
+                  </Button>
+                </div>
               ) : (
                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
                   {internships.map((row) => (
