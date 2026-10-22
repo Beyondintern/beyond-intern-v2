@@ -68,7 +68,9 @@ import {
 import type { InternshipRow, InternshipAssignmentRow } from "./actions";
 import type { CarouselImageRow, BrandPartnerRow, PressArticleRow } from "./actions";
 
-const ADMIN_EMAILS = ["info@beyondintern.com", "ansupoddar11@gmail.com"];
+// Shared with the server-side guard (src/lib/auth-guards.ts) via this
+// constant — the page and requireAdmin() checks can never diverge.
+import { ADMIN_EMAILS } from "@/lib/admin-emails";
 
 type Status = "idle" | "loading" | "success" | "error";
 type Tab = "enrol" | "courses" | "analytics" | "webinars" | "notifications" | "collabs" | "internships";
@@ -640,8 +642,19 @@ export default function AdminPage() {
 
   async function handleDeleteInternship(id: string) {
     if (!confirm("Remove this internship listing permanently?")) return;
-    const result = await deleteInternship(id);
-    if (result.success) loadInternships();
+    setInternshipStatus("loading");
+    setInternshipMsg("");
+    try {
+      const result = await deleteInternship(id);
+      setInternshipStatus(result.success ? "success" : "error");
+      setInternshipMsg(result.success ? "Listing removed." : (result.message || "Failed to delete internship."));
+      if (result.success) loadInternships();
+    } catch (err) {
+      setInternshipStatus("error");
+      setInternshipMsg(err instanceof Error ? err.message : "Delete failed.");
+    } finally {
+      setInternshipStatus((prev) => (prev === "loading" ? "error" : prev));
+    }
   }
 
   async function handleAssignInternship(e: React.FormEvent) {
